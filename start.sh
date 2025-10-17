@@ -26,7 +26,7 @@ pkill ngrok 2>/dev/null || true
 echo "✅ Existing services stopped"
 
 echo "🔄 Rebuilding Docker image..."
-docker build -t spookygpt_site . || { echo "❌ Docker build failed"; exit 1; }
+docker build --no-cache --build-arg HTTP_PROXY= --build-arg HTTPS_PROXY= --build-arg http_proxy= --build-arg https_proxy= -t spookygpt_site . || { echo "❌ Docker build failed"; exit 1; }
 echo "✅ Docker image rebuilt successfully"
 
 # Start Ollama

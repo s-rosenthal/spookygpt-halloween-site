@@ -6,22 +6,18 @@ import cors from "cors";
 import fs from "fs";
 
 const app = express();
+const PORT = process.env.PORT || 3000;
 
-// Global query counter (since process start)
+// Global query counter
 let totalQueries = 0;
 const serverStartedAt = Date.now();
 
-// Performance optimizations
-app.use(express.json({ limit: '1mb' }));
-app.use(cors({
-  origin: true,
-  credentials: true
-}));
-
-// Load Halloween config
+// Setup file paths
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const configPath = path.join(__dirname, "halloween-config.json");
+
+// Load Halloween configuration
 let halloweenConfig = {};
 try {
   halloweenConfig = JSON.parse(fs.readFileSync(configPath, "utf8"));
@@ -29,16 +25,21 @@ try {
   console.warn("Could not load Halloween config:", err.message);
 }
 
-// Remove session limits; no middleware blocking access
+// Middleware
+app.use(express.json({ limit: '1mb' }));
+app.use(cors({
+  origin: true,
+  credentials: true
+}));
 
-// Serve static frontend files with caching
+// Serve static files
 app.use(express.static(path.join(__dirname, "public"), {
-  maxAge: '1d', // Cache static files for 1 day
+  maxAge: '1d',
   etag: true,
   lastModified: true
 }));
 
-// Chat endpoint with streaming
+// Chat endpoint
 app.post("/api/chat", async (req, res) => {
   try {
     const { prompt, character = "default", cachedMessages = [], cachedResponses = [] } = req.body;
@@ -47,19 +48,16 @@ app.post("/api/chat", async (req, res) => {
       return res.status(400).json({ error: "Missing prompt" });
     }
 
-    // Get character config
+    // Get character configuration
     const characterConfig = halloweenConfig.characters?.[character] || halloweenConfig.characters?.default;
     const settings = halloweenConfig.settings || {};
     
-    // Create system prompt with Halloween character
+    // Build context prompt
     const systemPrompt = characterConfig?.systemPrompt || "You are a helpful Halloween-themed assistant.";
-    
-    // Build context from cache
     let contextPrompt = systemPrompt + "\n\n";
     
-    // Add recent conversation history (most recent messages first)
+    // Add conversation history
     const maxHistory = Math.min(cachedMessages.length, cachedResponses.length);
-    
     for (let i = maxHistory - 1; i >= 0; i--) {
       contextPrompt += `User: ${cachedMessages[i]}\n`;
       if (cachedResponses[i]) {
@@ -67,18 +65,17 @@ app.post("/api/chat", async (req, res) => {
       }
     }
     
-    // Add current prompt
     contextPrompt += `User: ${prompt}\nAssistant:`;
 
-    // Increment global query counter and expose as header
+    // Increment query counter
     totalQueries += 1;
     res.setHeader('X-Total-Queries', String(totalQueries));
 
-    // Set up streaming response
+    // Setup streaming response
     res.setHeader('Content-Type', 'text/plain');
     res.setHeader('Transfer-Encoding', 'chunked');
 
-    // Call Ollama with streaming
+    // Call Ollama API
     const ollamaRes = await fetch("http://host.docker.internal:11434/api/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -88,7 +85,7 @@ app.post("/api/chat", async (req, res) => {
         stream: true,
         options: {
           temperature: settings.temperature || 0.6,
-          num_predict: settings.maxTokens || 30,
+          num_predict: settings.maxTokens || 69,
         }
       }),
     });
@@ -101,10 +98,8 @@ app.post("/api/chat", async (req, res) => {
       return;
     }
 
-    // Handle streaming response from Ollama
+    // Stream response
     const decoder = new TextDecoder();
-    
-    // Read the response in chunks
     for await (const chunk of ollamaRes.body) {
       const text = decoder.decode(chunk, { stream: true });
       const lines = text.split('\n');
@@ -115,6 +110,10 @@ app.post("/api/chat", async (req, res) => {
             const data = JSON.parse(line);
             if (data.response) {
               res.write(data.response);
+            }
+            // Check if this is the final response
+            if (data.done) {
+              break;
             }
           } catch (e) {
             // Skip invalid JSON lines
@@ -131,12 +130,11 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
-// Optional: simple stats endpoint
+// API endpoints
 app.get('/api/stats', (_req, res) => {
   res.json({ totalQueries, serverStartedAt });
 });
 
-// Get available characters
 app.get("/api/characters", (req, res) => {
   const characters = Object.keys(halloweenConfig.characters || {}).map(key => ({
     id: key,
@@ -146,10 +144,10 @@ app.get("/api/characters", (req, res) => {
   res.json({ characters });
 });
 
-// Fallback: serve index.html for any other route
+// Fallback route
 app.get("*", (_, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-const PORT = process.env.PORT || 3000;
+// Start server
 app.listen(PORT, () => console.log(`✅ SpookyGPT running on port ${PORT}`));

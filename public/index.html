@@ -5,11 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="SpookyGPT - Your Halloween AI companion" />
   <meta name="theme-color" content="#ff4500" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>SpookyGPT 👻</title>
   
-  <!-- Preload critical resources -->
-  <link rel="preload" href="halloween-kids-background-music-417482.mp3" as="audio" />
   <style>
+    /* Reset and base styles */
     * {
       box-sizing: border-box;
     }
@@ -21,8 +22,6 @@
         radial-gradient(circle at 80% 20%, rgba(139, 0, 139, 0.3) 0%, transparent 50%),
         radial-gradient(circle at 40% 40%, rgba(255, 140, 0, 0.2) 0%, transparent 50%),
         radial-gradient(circle at 60% 70%, rgba(220, 20, 60, 0.2) 0%, transparent 50%),
-        radial-gradient(circle at 10% 30%, rgba(75, 0, 130, 0.15) 0%, transparent 40%),
-        radial-gradient(circle at 90% 60%, rgba(255, 20, 147, 0.15) 0%, transparent 40%),
         linear-gradient(135deg, #0a0a0a 0%, #1a0a0a 25%, #0f0a1a 50%, #1a0a0a 75%, #0a0a0a 100%);
       color: #f0e6d2;
       margin: 0;
@@ -31,62 +30,14 @@
       overflow-x: hidden;
     }
 
-    /* Enhanced animated background with multiple layers */
-    body::before {
-      content: '';
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: 
-        radial-gradient(circle at 20% 80%, rgba(255, 69, 0, 0.25) 0%, transparent 50%),
-        radial-gradient(circle at 80% 20%, rgba(139, 0, 139, 0.25) 0%, transparent 50%),
-        radial-gradient(circle at 40% 40%, rgba(255, 140, 0, 0.2) 0%, transparent 50%),
-        radial-gradient(circle at 60% 70%, rgba(220, 20, 60, 0.2) 0%, transparent 50%),
-        radial-gradient(circle at 10% 30%, rgba(75, 0, 130, 0.15) 0%, transparent 40%),
-        radial-gradient(circle at 90% 60%, rgba(255, 20, 147, 0.15) 0%, transparent 40%);
-      animation: float 25s ease-in-out infinite;
-      z-index: -2;
-    }
 
-    /* Enhanced floating particles background */
-    body::after {
-      content: '';
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background-image: 
-        radial-gradient(2px 2px at 20px 30px, rgba(255, 255, 255, 0.4), transparent),
-        radial-gradient(2px 2px at 40px 70px, rgba(255, 140, 0, 0.5), transparent),
-        radial-gradient(1px 1px at 90px 40px, rgba(255, 69, 0, 0.6), transparent),
-        radial-gradient(1px 1px at 130px 80px, rgba(139, 0, 139, 0.4), transparent),
-        radial-gradient(2px 2px at 160px 30px, rgba(255, 255, 255, 0.3), transparent),
-        radial-gradient(1px 1px at 200px 50px, rgba(255, 20, 147, 0.4), transparent),
-        radial-gradient(2px 2px at 250px 20px, rgba(75, 0, 130, 0.3), transparent),
-        radial-gradient(1px 1px at 300px 90px, rgba(220, 20, 60, 0.4), transparent);
-      background-repeat: repeat;
-      background-size: 300px 150px;
-      animation: sparkle 20s linear infinite;
-      z-index: -1;
-      pointer-events: none;
-      opacity: 0.8;
-    }
 
-    @keyframes float {
-      0%, 100% { transform: translateY(0px) rotate(0deg) scale(1); }
-      25% { transform: translateY(-15px) rotate(0.5deg) scale(1.02); }
-      50% { transform: translateY(-25px) rotate(1deg) scale(1.05); }
-      75% { transform: translateY(-10px) rotate(0.5deg) scale(1.02); }
-    }
+    /* Animations */
 
-    @keyframes sparkle {
-      0% { transform: translateY(0px) translateX(0px); }
-      100% { transform: translateY(-100px) translateX(50px); }
-    }
 
+
+
+    /* Layout */
     .container {
       max-width: 100%;
       margin: 0 auto;
@@ -99,32 +50,14 @@
     .header {
       text-align: center;
       margin-bottom: 1rem;
-      animation: fadeInDown 1s ease-out;
-    }
-
-    @keyframes fadeInDown {
-      from {
-        opacity: 0;
-        transform: translateY(-30px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
     }
 
     h1 {
       font-size: 2.5rem;
       margin: 0;
       font-weight: 800;
-      background: linear-gradient(45deg, #ff4500, #ff8c00, #dc143c, #8b008b, #ff6347, #ff1493, #00ff7f);
-      background-size: 600% 600%;
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      animation: gradientShift 4s ease-in-out infinite, glow 2s ease-in-out infinite alternate;
-      text-shadow: 0 0 40px rgba(255, 69, 0, 0.6), 0 0 80px rgba(255, 140, 0, 0.4);
-      filter: drop-shadow(0 0 15px rgba(255, 140, 0, 0.5));
+      color: #ff4500;
+      text-shadow: 0 0 20px rgba(255, 69, 0, 0.5);
       position: relative;
       z-index: 1;
     }
@@ -147,25 +80,13 @@
       font-size: 1.5rem;
     }
 
-    @keyframes glow {
-      0% { filter: drop-shadow(0 0 15px rgba(255, 140, 0, 0.5)) brightness(1); }
-      100% { filter: drop-shadow(0 0 25px rgba(255, 140, 0, 0.8)) brightness(1.2); }
-    }
-
-    @keyframes gradientShift {
-      0%, 100% { background-position: 0% 50%; }
-      25% { background-position: 50% 0%; }
-      50% { background-position: 100% 50%; }
-      75% { background-position: 50% 100%; }
-    }
-
+    /* Controls */
     .controls {
       display: flex;
       flex-direction: column;
       gap: 0.5rem;
       margin-bottom: 0.75rem;
       align-items: stretch;
-      animation: fadeInUp 1s ease-out 0.3s both;
     }
     
     .controls > * {
@@ -173,17 +94,7 @@
       margin: 0;
     }
 
-    @keyframes fadeInUp {
-      from {
-        opacity: 0;
-        transform: translateY(30px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
+    /* Form elements */
     select, button {
       padding: 0.6rem 0.8rem;
       border: none;
@@ -193,70 +104,27 @@
       font-size: 0.85rem;
       font-weight: 600;
       cursor: pointer;
-      transition: none;
       backdrop-filter: blur(15px);
       border: 2px solid rgba(255, 140, 0, 0.4);
       box-shadow: 
         0 4px 15px rgba(255, 69, 0, 0.3),
         inset 0 1px 0 rgba(255, 255, 255, 0.1);
-      position: relative;
-      overflow: hidden;
       text-align: center;
-    }
-
-    select::before, button::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: -100%;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-      transition: left 0.5s;
-    }
-
-    select:hover::before, button:hover::before {
-      left: 100%;
     }
 
     select:hover, button:hover {
       background: rgba(255, 69, 0, 0.35);
       border-color: rgba(255, 69, 0, 0.6);
     }
-    
-    /* Remove all animations for clean interface */
-    select, button, input {
-      transition: none;
-    }
-    
-    select:hover, button:hover {
-      transform: none;
-      box-shadow: none;
-    }
-    
-    input:focus {
-      transform: none;
-      box-shadow: none;
-    }
-    
-    select::before, button::before {
-      display: none;
-    }
 
     button:disabled {
       opacity: 0.6;
       cursor: not-allowed;
-      transform: none;
     }
 
     .clear-btn {
       background: linear-gradient(135deg, #dc143c, #8b0000, #b71c1c);
       border-color: rgba(220, 20, 60, 0.6);
-      position: relative;
-    }
-
-    .clear-btn::after {
-      display: none;
     }
 
     .clear-btn:hover {
@@ -269,9 +137,7 @@
     .music-btn {
       background: linear-gradient(135deg, #ff8c00, #ffa500, #ffb347);
       border-color: rgba(255, 140, 0, 0.6);
-      position: relative;
     }
-
 
     .music-btn:hover {
       background: linear-gradient(135deg, #ffa500, #ffb347, #ffc107);
@@ -280,16 +146,12 @@
         0 0 30px rgba(255, 165, 0, 0.4);
     }
 
-    @keyframes pulse {
-      0%, 100% { transform: translateY(-50%) scale(1); }
-      50% { transform: translateY(-50%) scale(1.2); }
-    }
-
     .music-btn.muted {
       background: linear-gradient(45deg, #666, #888);
       opacity: 0.7;
     }
 
+    /* Chat area */
     #chat {
       flex: 1;
       background: rgba(139, 0, 139, 0.15);
@@ -302,7 +164,6 @@
         0 0 0 1px rgba(255, 140, 0, 0.2);
       backdrop-filter: blur(25px);
       border: 2px solid rgba(255, 140, 0, 0.4);
-      animation: fadeInUp 1s ease-out 0.9s both;
       min-height: 70vh;
       max-height: 70vh;
       position: relative;
@@ -323,12 +184,12 @@
       z-index: 0;
     }
 
+    /* Messages */
     .msg {
       margin: 0.4rem 0;
       padding: 1rem 1.25rem;
       border-radius: 18px;
       line-height: 1.6;
-      animation: slideIn 0.6s cubic-bezier(0.4, 0, 0.2, 1);
       position: relative;
       overflow: hidden;
       font-size: 0.95rem;
@@ -337,52 +198,9 @@
       border: 1px solid rgba(255, 255, 255, 0.1);
     }
 
-    .msg::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.15), transparent);
-      transform: translateX(-100%);
-      transition: transform 0.8s ease;
-    }
-
-    .msg:hover::before {
-      transform: translateX(100%);
-    }
-
     .msg:hover {
       transform: translateY(-2px);
       box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-    }
-
-    @keyframes slideIn {
-      from {
-        opacity: 0;
-        transform: translateX(-20px);
-      }
-      to {
-        opacity: 1;
-        transform: translateX(0);
-      }
-    }
-
-    .msg::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
-      transform: translateX(-100%);
-      transition: transform 0.6s ease;
-    }
-
-    .msg:hover::before {
-      transform: translateX(100%);
     }
 
     .user {
@@ -392,11 +210,6 @@
         0 6px 20px rgba(139, 0, 139, 0.5),
         0 0 15px rgba(139, 0, 139, 0.3);
       border: 2px solid rgba(255, 140, 0, 0.3);
-      position: relative;
-    }
-
-    .user::after {
-      display: none;
     }
 
     .bot {
@@ -406,11 +219,6 @@
         0 6px 20px rgba(255, 69, 0, 0.5),
         0 0 15px rgba(255, 69, 0, 0.3);
       border: 2px solid rgba(255, 140, 0, 0.3);
-      position: relative;
-    }
-
-    .bot::after {
-      display: none;
     }
 
     .msg-content {
@@ -418,10 +226,10 @@
       z-index: 1;
     }
 
+    /* Input area */
     #input-area {
       display: flex;
       gap: 0.4rem;
-      animation: fadeInUp 1s ease-out 0.6s both;
       margin-bottom: 0.5rem;
       background: rgba(26, 10, 10, 0.9);
       padding: 0.4rem;
@@ -459,7 +267,6 @@
       font-size: 16px;
       backdrop-filter: blur(15px);
       border: 2px solid rgba(255, 140, 0, 0.4);
-      transition: none;
       box-shadow: 
         0 4px 15px rgba(255, 69, 0, 0.2),
         inset 0 1px 0 rgba(255, 255, 255, 0.1);
@@ -495,14 +302,6 @@
         0 0 20px rgba(255, 69, 0, 0.2);
     }
 
-    #send::before {
-      content: '🚀';
-      position: absolute;
-      right: 0.75rem;
-      top: 50%;
-      transform: translateY(-50%);
-      animation: rocket 2s ease-in-out infinite;
-    }
 
     #send:hover {
       background: linear-gradient(135deg, #ff6347, #ff1744, #d32f2f);
@@ -511,12 +310,8 @@
         0 0 25px rgba(255, 69, 0, 0.3);
     }
 
-    @keyframes rocket {
-      0%, 100% { transform: translateY(-50%) rotate(0deg); }
-      50% { transform: translateY(-60%) rotate(10deg); }
-    }
 
-    /* Enhanced scrollbar styling */
+    /* Scrollbar */
     #chat::-webkit-scrollbar {
       width: 12px;
     }
@@ -539,98 +334,11 @@
       box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
     }
 
-    #chat::-webkit-scrollbar-corner {
-      background: transparent;
-    }
-
-    /* Single layout for all screen sizes */
-    .container {
-      padding: 0.5rem;
-    }
-    
-    h1 {
-      font-size: 1.8rem;
-      margin-bottom: 0.5rem;
-    }
-    
-    h1::before, h1::after {
-      font-size: 1rem;
-      left: -1.5rem;
-      right: -1.5rem;
-    }
-    
-    #queryCounter {
-      order: -1;
-      text-align: center;
-      font-size: 0.75rem;
-      padding: 0.4rem 0.6rem;
-    }
-    
-    #chat {
-      min-height: 60vh;
-      max-height: 60vh;
-      padding: 0.75rem;
-      border-radius: 15px;
-    }
-    
-    .msg {
-      margin: 0.25rem 0;
-      padding: 0.6rem 0.8rem;
-      font-size: 0.85rem;
-      border-radius: 12px;
-    }
-    
-    .user {
-      margin-left: 0.5rem;
-    }
-    
-    .user::after {
-      left: -0.8rem;
-      font-size: 0.9rem;
-    }
-    
-    .bot {
-      margin-right: 0.5rem;
-    }
-    
-    .bot::after {
-      right: -0.8rem;
-      font-size: 0.9rem;
-    }
-
-    /* Enhanced typing animation */
-    .typing {
-      position: relative;
-    }
-
+    /* Typing animation */
     .typing::after {
       content: '▋';
-      animation: blink 1.2s infinite;
       color: #ff4500;
       font-weight: bold;
-    }
-
-    @keyframes blink {
-      0%, 50% { opacity: 1; transform: scale(1); }
-      51%, 100% { opacity: 0; transform: scale(0.8); }
-    }
-
-    /* Floating elements animation */
-    @keyframes floatElements {
-      0%, 100% { transform: translateY(0px) rotate(0deg); }
-      25% { transform: translateY(-10px) rotate(2deg); }
-      50% { transform: translateY(-20px) rotate(0deg); }
-      75% { transform: translateY(-10px) rotate(-2deg); }
-    }
-
-    /* Glow effect for interactive elements */
-    .glow {
-      animation: glowPulse 2s ease-in-out infinite alternate;
-    }
-
-    @keyframes glowPulse {
-      0% { box-shadow: 0 0 20px rgba(255, 140, 0, 0.3); }
-      100% { box-shadow: 0 0 40px rgba(255, 140, 0, 0.6); }
     }
 
     /* Permission overlay */
@@ -646,7 +354,6 @@
       justify-content: center;
       align-items: center;
       z-index: 2000;
-      animation: fadeIn 0.5s ease-out;
     }
 
     .permission-content {
@@ -668,7 +375,6 @@
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
-      animation: gradientShift 2s ease-in-out infinite;
     }
 
     .permission-text {
@@ -697,7 +403,78 @@
       box-shadow: 0 6px 20px rgba(255, 69, 0, 0.6);
     }
 
+    /* Query counter */
+    #queryCounter {
+      order: -1;
+      text-align: center;
+      font-size: 0.75rem;
+      padding: 0.4rem 0.6rem;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      border-radius: 12px;
+      background: rgba(255, 140, 0, 0.2);
+      border: 2px solid rgba(255, 140, 0, 0.4);
+      color: #f0e6d2;
+      font-weight: 600;
+      box-shadow: 0 4px 15px rgba(255, 69, 0, 0.2);
+      backdrop-filter: blur(10px);
+    }
+
+    #sessionCount {
+      color: #ff4500;
+      font-weight: 700;
+    }
+
+    /* Cooldown display */
+    #cooldownDisplay {
+      display: none;
+      color: #ff4500;
+      font-weight: 700;
+      font-size: 0.9rem;
+      text-align: center;
+      padding: 0.5rem;
+    }
+
+    /* Mobile responsiveness */
     @media (max-width: 768px) {
+      .container {
+        padding: 0.5rem;
+      }
+      
+      h1 {
+        font-size: 1.8rem;
+        margin-bottom: 0.5rem;
+      }
+      
+      h1::before, h1::after {
+        font-size: 1rem;
+        left: -1.5rem;
+        right: -1.5rem;
+      }
+      
+      #chat {
+        min-height: 60vh;
+        max-height: 60vh;
+        padding: 0.75rem;
+        border-radius: 15px;
+      }
+      
+      .msg {
+        margin: 0.25rem 0;
+        padding: 0.6rem 0.8rem;
+        font-size: 0.85rem;
+        border-radius: 12px;
+      }
+      
+      .user {
+        margin-left: 0.5rem;
+      }
+      
+      .bot {
+        margin-right: 0.5rem;
+      }
+
       .permission-content {
         margin: 0.5rem;
         padding: 1.5rem;
@@ -722,7 +499,7 @@
   <!-- Permission overlay -->
   <div class="permission-overlay" id="permissionOverlay">
     <div class="permission-content">
-      <div class="permission-title"> Welcome to SpookyGPT! </div>
+      <div class="permission-title">Welcome to SpookyGPT!</div>
       <div class="permission-text">
         To enhance your spooky experience, we'd like to play Halloween background music.<br><br>
         Click "Allow Music" to start the spooky soundtrack!
@@ -747,14 +524,14 @@
       </select>
       <button id="musicToggle" class="music-btn">🎵 Music On</button>
       <button id="clear" class="clear-btn">🧹 Clear Chat</button>
-              <div id="queryCounter" style="display:flex; gap:8px; align-items:center; padding: 0.5rem 0.75rem; border-radius: 12px; background: rgba(255, 140, 0, 0.2); border: 2px solid rgba(255, 140, 0, 0.4); color: #f0e6d2; font-size: 0.8rem; font-weight: 600; box-shadow: 0 4px 15px rgba(255, 69, 0, 0.2); backdrop-filter: blur(10px);">
-                <span>🕒 Session: <span id="sessionCount" style="color: #ff4500; font-weight: 700;">0</span></span>
-              </div>
+      <div id="queryCounter">
+        <span>💬 Queries Count: <span id="sessionCount">0</span></span>
+      </div>
     </div>
 
     <div id="input-area">
       <input id="prompt" type="text" placeholder="Ask something spooky..." />
-      <div id="cooldownDisplay" style="display: none; color: #ff4500; font-weight: 700; font-size: 0.9rem; text-align: center; padding: 0.5rem;">
+      <div id="cooldownDisplay">
         Cooldown: <span id="cooldownTimer">0</span>s
       </div>
       <button id="send">Send</button>

@@ -1,26 +1,19 @@
 {
   "name": "spookygpt_site",
   "version": "1.0.0",
-  "description": "This is a ready-to-deploy site:",
-  "main": "index.js",
+  "description": "SpookyGPT - Your Halloween AI companion",
+  "main": "server.js",
   "scripts": {
+    "start": "node server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": ["halloween", "ai", "chat", "spooky"],
   "author": "",
   "license": "ISC",
-  "dependencies": {
-    "cors": "^2.8.5",
-    "express": "^5.1.0",
-    "express-rate-limit": "^8.1.0",
-    "helmet": "^8.1.0",
-    "node-fetch": "^3.3.2"
-  },
   "type": "module",
   "dependencies": {
-    "express": "^4.18.2",
-    "express-basic-auth": "^1.2.1",
     "cors": "^2.8.5",
+    "express": "^4.18.2",
     "node-fetch": "^3.3.2"
   }
 }

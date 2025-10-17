@@ -1,3 +1,4 @@
+// DOM Elements
 const chatBox = document.getElementById("chat");
 const input = document.getElementById("prompt");
 const sendBtn = document.getElementById("send");
@@ -11,54 +12,16 @@ const sessionCountEl = document.getElementById("sessionCount");
 const cooldownDisplayEl = document.getElementById("cooldownDisplay");
 const cooldownTimerEl = document.getElementById("cooldownTimer");
 
+// State variables
 let currentCharacter = "default";
 let characters = {};
 let isMusicPlaying = false;
 let cooldownActive = false;
 let cooldownEndTime = 0;
 let cooldownInterval = null;
+let permissionShown = false;
 
-// Cooldown system
-function startCooldown() {
-  cooldownActive = true;
-  cooldownEndTime = Date.now() + 15000; // 15 seconds
-  sessionStorage.setItem('spookygpt_cooldown_end', String(cooldownEndTime));
-  
-  cooldownDisplayEl.style.display = 'block';
-  input.disabled = true;
-  input.placeholder = "Cooldown active...";
-  
-  // Hide the send button during cooldown
-  sendBtn.style.display = 'none';
-  
-  cooldownInterval = setInterval(() => {
-    const remaining = Math.ceil((cooldownEndTime - Date.now()) / 1000);
-    if (remaining <= 0) {
-      endCooldown();
-    } else {
-      cooldownTimerEl.textContent = remaining;
-    }
-  }, 1000);
-}
-
-function endCooldown() {
-  cooldownActive = false;
-  sessionStorage.removeItem('spookygpt_cooldown_end');
-  
-  cooldownDisplayEl.style.display = 'none';
-  input.disabled = false;
-  input.placeholder = "Ask something spooky...";
-  
-  // Show the send button again after cooldown
-  sendBtn.style.display = 'block';
-  
-  if (cooldownInterval) {
-    clearInterval(cooldownInterval);
-    cooldownInterval = null;
-  }
-}
-
-// Cache system for each character
+// Character cache system
 let characterCache = {};
 
 function initializeCharacterCache(characterId) {
@@ -99,103 +62,43 @@ function getCachedResponses(characterId) {
   return characterCache[characterId].responses;
 }
 
-// Load available characters
-async function loadCharacters() {
-  try {
-    // Initialize session counter from sessionStorage
-    const existingSessionCount = Number(sessionStorage.getItem('spookygpt_session_queries') || '0');
-    if (sessionCountEl) sessionCountEl.textContent = String(existingSessionCount);
-    
-    // Check if cooldown is still active
-    const cooldownEnd = Number(sessionStorage.getItem('spookygpt_cooldown_end') || '0');
-    if (cooldownEnd > Date.now()) {
-      cooldownEndTime = cooldownEnd;
-      startCooldown();
+// Cooldown system
+function startCooldown() {
+  cooldownActive = true;
+  cooldownEndTime = Date.now() + 15000; // 15 seconds
+  sessionStorage.setItem('spookygpt_cooldown_end', String(cooldownEndTime));
+  
+  cooldownDisplayEl.style.display = 'block';
+  input.disabled = true;
+  input.placeholder = "Cooldown active...";
+  sendBtn.style.display = 'none';
+  
+  cooldownInterval = setInterval(() => {
+    const remaining = Math.ceil((cooldownEndTime - Date.now()) / 1000);
+    if (remaining <= 0) {
+      endCooldown();
+    } else {
+      cooldownTimerEl.textContent = remaining;
     }
+  }, 1000);
+}
 
-    const res = await fetch("/api/characters");
-    
-    if (res.status === 503) {
-      const data = await res.json();
-      showServerFullMessage(data.error);
-      return;
-    }
-    
-    const data = await res.json();
-    characters = data.characters;
-    
-    // Populate character selector
-    characterSelect.innerHTML = "";
-    characters.forEach(char => {
-      const option = document.createElement("option");
-      option.value = char.id;
-      option.textContent = char.name;
-      characterSelect.appendChild(option);
-    });
-    
-    // Set default character
-    currentCharacter = characters[0]?.id || "default";
-    characterSelect.value = currentCharacter;
-    
-    // Show greeting
-    const greeting = characters.find(c => c.id === currentCharacter)?.greeting || "👻 Boo! I'm SpookyGPT!";
-    appendMessage("bot", greeting);
-  } catch (err) {
-    console.error("Failed to load characters:", err);
-    appendMessage("bot", "👻 Boo! I'm SpookyGPT! What spooky topic can I help you with?");
+function endCooldown() {
+  cooldownActive = false;
+  sessionStorage.removeItem('spookygpt_cooldown_end');
+  
+  cooldownDisplayEl.style.display = 'none';
+  input.disabled = false;
+  input.placeholder = "Ask something spooky...";
+  sendBtn.style.display = 'block';
+  
+  if (cooldownInterval) {
+    clearInterval(cooldownInterval);
+    cooldownInterval = null;
   }
 }
 
-// Show server full message
-function showServerFullMessage(message) {
-  document.querySelector('.container').style.display = 'none';
-  document.querySelector('.permission-overlay').style.display = 'none';
-  
-  const overlay = document.createElement('div');
-  overlay.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(26, 10, 10, 0.95);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-    backdrop-filter: blur(10px);
-  `;
-  
-  const content = document.createElement('div');
-  content.style.cssText = `
-    background: rgba(139, 0, 139, 0.2);
-    border-radius: 20px;
-    padding: 2rem;
-    text-align: center;
-    backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 140, 0, 0.3);
-    box-shadow: 0 8px 32px rgba(139, 0, 139, 0.4);
-    max-width: 400px;
-    width: 90%;
-  `;
-  
-  content.innerHTML = `
-    <div style="font-size: 1.5rem; font-weight: bold; margin-bottom: 1rem; background: linear-gradient(45deg, #ff4500, #ff8c00, #dc143c); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
-      👻 Server Full! 👻
-    </div>
-    <div style="margin-bottom: 1.5rem; line-height: 1.6;">
-      ${message}
-    </div>
-    <button onclick="location.reload()" style="padding: 0.75rem 1.5rem; border: none; border-radius: 15px; background: linear-gradient(45deg, #ff4500, #dc143c); color: #f0e6d2; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(255, 69, 0, 0.3);">
-      🔄 Try Again
-    </button>
-  `;
-  
-  overlay.appendChild(content);
-  document.body.appendChild(overlay);
-}
-
-// Sound system - disabled on mobile
+// Sound system
 let soundEnabled = true;
 let audioContext;
 let soundEffects = {};
@@ -304,7 +207,102 @@ function addButtonEffects() {
   input.addEventListener('focus', () => playSound('hover'));
 }
 
-// Send message
+// API functions
+async function loadCharacters() {
+  try {
+    // Initialize session counter from sessionStorage
+    const existingSessionCount = Number(sessionStorage.getItem('spookygpt_session_queries') || '0');
+    if (sessionCountEl) sessionCountEl.textContent = String(existingSessionCount);
+    
+    // Check if cooldown is still active
+    const cooldownEnd = Number(sessionStorage.getItem('spookygpt_cooldown_end') || '0');
+    if (cooldownEnd > Date.now()) {
+      cooldownEndTime = cooldownEnd;
+      startCooldown();
+    }
+
+    const res = await fetch("/api/characters");
+    
+    if (res.status === 503) {
+      const data = await res.json();
+      showServerFullMessage(data.error);
+      return;
+    }
+    
+    const data = await res.json();
+    characters = data.characters;
+    
+    // Populate character selector
+    characterSelect.innerHTML = "";
+    characters.forEach(char => {
+      const option = document.createElement("option");
+      option.value = char.id;
+      option.textContent = char.name;
+      characterSelect.appendChild(option);
+    });
+    
+    // Set default character
+    currentCharacter = characters[0]?.id || "default";
+    characterSelect.value = currentCharacter;
+    
+    // Show greeting
+    const greeting = characters.find(c => c.id === currentCharacter)?.greeting || "👻 Boo! I'm SpookyGPT!";
+    appendMessage("bot", greeting);
+  } catch (err) {
+    console.error("Failed to load characters:", err);
+    appendMessage("bot", "👻 Boo! I'm SpookyGPT! What spooky topic can I help you with?");
+  }
+}
+
+function showServerFullMessage(message) {
+  document.querySelector('.container').style.display = 'none';
+  document.querySelector('.permission-overlay').style.display = 'none';
+  
+  const overlay = document.createElement('div');
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(26, 10, 10, 0.95);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    backdrop-filter: blur(10px);
+  `;
+  
+  const content = document.createElement('div');
+  content.style.cssText = `
+    background: rgba(139, 0, 139, 0.2);
+    border-radius: 20px;
+    padding: 2rem;
+    text-align: center;
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 140, 0, 0.3);
+    box-shadow: 0 8px 32px rgba(139, 0, 139, 0.4);
+    max-width: 400px;
+    width: 90%;
+  `;
+  
+  content.innerHTML = `
+    <div style="font-size: 1.5rem; font-weight: bold; margin-bottom: 1rem; background: linear-gradient(45deg, #ff4500, #ff8c00, #dc143c); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+      👻 Server Full! 👻
+    </div>
+    <div style="margin-bottom: 1.5rem; line-height: 1.6;">
+      ${message}
+    </div>
+    <button onclick="location.reload()" style="padding: 0.75rem 1.5rem; border: none; border-radius: 15px; background: linear-gradient(45deg, #ff4500, #dc143c); color: #f0e6d2; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(255, 69, 0, 0.3);">
+      🔄 Try Again
+    </button>
+  `;
+  
+  overlay.appendChild(content);
+  document.body.appendChild(overlay);
+}
+
+// Chat functions
 async function sendMessage() {
   const text = input.value.trim();
   if (!text || cooldownActive) return;
@@ -321,7 +319,7 @@ async function sendMessage() {
   sessionStorage.setItem('spookygpt_session_queries', String(newSessionCount));
   if (sessionCountEl) sessionCountEl.textContent = String(newSessionCount);
 
-  // Check if cooldown should start (every 5 messages: 5, 10, 15, 20, etc.)
+  // Check if cooldown should start (every 5 messages)
   if (newSessionCount % 5 === 0 && !cooldownActive) {
     startCooldown();
   }
@@ -362,13 +360,14 @@ async function sendMessage() {
       const { done, value } = await reader.read();
       if (done) break;
 
-      const chunk = decoder.decode(value);
+      const chunk = decoder.decode(value, { stream: true });
       fullResponse += chunk;
       updateMessage(thinkingMsg, fullResponse);
       
       await new Promise(resolve => setTimeout(resolve, 2));
     }
 
+    // Ensure we have the complete response
     updateMessage(thinkingMsg, fullResponse);
     addToResponseCache(currentCharacter, fullResponse);
 
@@ -383,15 +382,17 @@ async function sendMessage() {
 
 function clearChat() {
   chatBox.innerHTML = "";
+  
+  // Clear all character caches
+  characterCache = {};
+  
+  // Show greeting for current character
   const greeting = characters.find(c => c.id === currentCharacter)?.greeting || "👻 Boo! I'm SpookyGPT!";
   appendMessage("bot", greeting);
 }
 
 // Music functions
-let permissionShown = false;
-
 function requestMusicPermission() {
-  // Show permission overlay by default on all devices
   if (permissionOverlay && !permissionShown) {
     permissionOverlay.style.display = 'flex';
   }
@@ -470,7 +471,7 @@ characterSelect.addEventListener("change", (e) => {
   clearChat();
 });
 
-// Initialize
+// Initialize application
 loadCharacters();
 requestMusicPermission();
 updateMusicButton();
