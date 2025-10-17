@@ -18,6 +18,9 @@ function cleanup {
 # Trap SIGINT and SIGTERM to clean up
 trap cleanup SIGINT SIGTERM
 
+# Set secure admin password
+export SPOOKYGPT_ADMIN_PASSWORD="SpookyAdmin2025!"
+
 echo "🛑 Stopping existing services..."
 docker stop spookygpt 2>/dev/null || true
 docker rm spookygpt 2>/dev/null || true
@@ -38,6 +41,7 @@ OLLAMA_PID=$!
 echo "🐳 Starting SpookyGPT container..."
 docker run -p 3000:3000 \
   -e NODE_ENV=production \
+  -e SPOOKYGPT_ADMIN_PASSWORD="$SPOOKYGPT_ADMIN_PASSWORD" \
   --memory=512m --cpus=0.5 \
   --name spookygpt spookygpt_site &
 DOCKER_PID=$!
@@ -62,6 +66,11 @@ if [ -n "$NGROK_URL" ]; then
     echo "👻 Visit the URL above to start chatting!"
     echo "📱 No login required - just start chatting!"
     echo "📊 Global query counter enabled"
+    echo ""
+    echo "🔧 Admin Panel:"
+    echo "   • Visit $NGROK_URL/admin.html for admin dashboard"
+    echo "   • Password: SpookyAdmin2025!"
+    echo "   • Monitor queries, uptime, and character usage"
     echo ""
     echo "Press Ctrl+C to stop all services"
 else

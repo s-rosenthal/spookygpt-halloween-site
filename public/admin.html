@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="SpookyGPT Admin Panel" />
+  <meta name="theme-color" content="#ff4500" />
+  <title>SpookyGPT Admin Panel 👻</title>
+  
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: 
+        radial-gradient(circle at 20% 80%, rgba(255, 69, 0, 0.3) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(139, 0, 139, 0.3) 0%, transparent 50%),
+        linear-gradient(135deg, #0a0a0a 0%, #1a0a0a 25%, #0f0a1a 50%, #1a0a0a 75%, #0a0a0a 100%);
+      color: #f0e6d2;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      margin: 0;
+      font-weight: 800;
+      color: #ff4500;
+      text-shadow: 0 0 20px rgba(255, 69, 0, 0.5);
+    }
+
+    .login-form {
+      background: rgba(139, 0, 139, 0.15);
+      border: 2px solid rgba(139, 0, 139, 0.4);
+      border-radius: 15px;
+      padding: 2rem;
+      margin: 2rem auto;
+      max-width: 400px;
+      text-align: center;
+    }
+
+    .login-form h2 {
+      color: #ff4500;
+      margin-bottom: 1rem;
+    }
+
+    .login-form input {
+      width: 100%;
+      padding: 0.8rem;
+      margin: 0.5rem 0;
+      border: 2px solid rgba(255, 69, 0, 0.4);
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.3);
+      color: #f0e6d2;
+      font-size: 1rem;
+    }
+
+    .login-form button {
+      width: 100%;
+      padding: 0.8rem;
+      margin: 1rem 0;
+      background: linear-gradient(135deg, #ff4500, #dc143c);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .login-form button:hover {
+      background: linear-gradient(135deg, #ff6347, #ff1744);
+      transform: translateY(-2px);
+    }
+
+    .admin-panel {
+      display: none;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .stat-card {
+      background: rgba(139, 0, 139, 0.15);
+      border: 2px solid rgba(139, 0, 139, 0.4);
+      border-radius: 15px;
+      padding: 1.5rem;
+      text-align: center;
+    }
+
+    .stat-card h3 {
+      color: #ff4500;
+      margin: 0 0 0.5rem 0;
+      font-size: 1.2rem;
+    }
+
+    .stat-value {
+      font-size: 2rem;
+      font-weight: bold;
+      color: #f0e6d2;
+      margin: 0.5rem 0;
+    }
+
+    .character-stats {
+      background: rgba(139, 0, 139, 0.15);
+      border: 2px solid rgba(139, 0, 139, 0.4);
+      border-radius: 15px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .character-stats h3 {
+      color: #ff4500;
+      margin: 0 0 1rem 0;
+    }
+
+    .character-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid rgba(255, 69, 0, 0.2);
+    }
+
+    .character-item:last-child {
+      border-bottom: none;
+    }
+
+    .character-name {
+      font-weight: 600;
+      color: #f0e6d2;
+    }
+
+    .character-count {
+      color: #ff4500;
+      font-weight: bold;
+    }
+
+    .query-item {
+      display: flex;
+      flex-direction: column;
+      padding: 0.8rem 0;
+      border-bottom: 1px solid rgba(255, 69, 0, 0.2);
+      margin-bottom: 0.5rem;
+    }
+
+    .query-item:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+    }
+
+    .query-text {
+      font-weight: 600;
+      color: #f0e6d2;
+      margin-bottom: 0.3rem;
+      line-height: 1.4;
+    }
+
+    .query-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+      color: #ff4500;
+    }
+
+    .query-character {
+      font-weight: 600;
+    }
+
+    .query-time {
+      opacity: 0.8;
+    }
+
+    .logout-btn {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      padding: 0.5rem 1rem;
+      background: linear-gradient(135deg, #dc143c, #8b0000);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .logout-btn:hover {
+      background: linear-gradient(135deg, #ff1744, #b71c1c);
+    }
+
+    .error {
+      color: #ff4500;
+      margin: 0.5rem 0;
+      font-weight: 600;
+    }
+
+    .success {
+      color: #00ff7f;
+      margin: 0.5rem 0;
+      font-weight: 600;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        padding: 1rem;
+      }
+      
+      h1 {
+        font-size: 2rem;
+      }
+      
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>👻 SpookyGPT Admin Panel</h1>
+    </div>
+
+    <!-- Login Form -->
+    <div class="login-form" id="loginForm">
+      <h2>🔐 Admin Login</h2>
+      <input type="password" id="passwordInput" placeholder="Enter admin password" />
+      <button onclick="login()">Login</button>
+      <div id="loginError" class="error"></div>
+    </div>
+
+    <!-- Admin Panel -->
+    <div class="admin-panel" id="adminPanel">
+      <button class="logout-btn" onclick="logout()">Logout</button>
+      
+      <div class="stats-grid">
+        <div class="stat-card">
+          <h3>📊 Total Queries</h3>
+          <div class="stat-value" id="totalQueries">0</div>
+        </div>
+        
+        <div class="stat-card">
+          <h3>⏱️ Server Uptime</h3>
+          <div class="stat-value" id="uptime">0h 0m 0s</div>
+        </div>
+        
+        <div class="stat-card">
+          <h3>🚀 Queries/Hour</h3>
+          <div class="stat-value" id="queriesPerHour">0</div>
+        </div>
+        
+        <div class="stat-card">
+          <h3>🔥 Recent Activity</h3>
+          <div class="stat-value" id="recentQueries">0</div>
+          <small>(Last 10 minutes)</small>
+        </div>
+      </div>
+
+      <div class="character-stats">
+        <h3>🎭 Character Usage Statistics</h3>
+        <div id="characterStats">
+          <!-- Character stats will be populated here -->
+        </div>
+      </div>
+
+      <div class="character-stats">
+        <h3>💬 Recent Queries</h3>
+        <div id="recentQueries">
+          <!-- Recent queries will be populated here -->
+        </div>
+      </div>
+
+      <div class="character-stats">
+        <h3>🔧 Service Controls</h3>
+        <div style="text-align: center; padding: 1rem;">
+          <div id="serviceStatus" style="margin-bottom: 1rem; font-weight: 600; color: #00ff7f;">
+            ✅ Services Running
+          </div>
+          <button id="pauseBtn" onclick="toggleServices()" style="padding: 0.8rem 1.5rem; background: linear-gradient(135deg, #ff4500, #dc143c); border: none; border-radius: 8px; color: white; font-weight: 600; cursor: pointer; transition: all 0.3s ease;">
+            ⏸️ Pause Services
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let adminToken = null;
+    let refreshInterval = null;
+
+    async function login() {
+      const password = document.getElementById('passwordInput').value;
+      const errorDiv = document.getElementById('loginError');
+      
+      try {
+        const response = await fetch('/api/admin/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ password })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          adminToken = data.token;
+          document.getElementById('loginForm').style.display = 'none';
+          document.getElementById('adminPanel').style.display = 'block';
+          errorDiv.textContent = '';
+          loadStats();
+          startRefresh();
+        } else {
+          errorDiv.textContent = data.error || 'Login failed';
+        }
+      } catch (err) {
+        errorDiv.textContent = 'Network error: ' + err.message;
+      }
+    }
+
+    async function logout() {
+      if (adminToken) {
+        try {
+          await fetch('/api/admin/logout', {
+            method: 'POST',
+            headers: {
+              'Authorization': 'Bearer ' + adminToken
+            }
+          });
+        } catch (err) {
+          console.error('Logout error:', err);
+        }
+      }
+      
+      adminToken = null;
+      document.getElementById('loginForm').style.display = 'block';
+      document.getElementById('adminPanel').style.display = 'none';
+      document.getElementById('passwordInput').value = '';
+      
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+        refreshInterval = null;
+      }
+    }
+
+    async function loadStats() {
+      if (!adminToken) return;
+      
+      try {
+        const response = await fetch('/api/admin/stats', {
+          headers: {
+            'Authorization': 'Bearer ' + adminToken
+          }
+        });
+        
+        if (response.ok) {
+          const stats = await response.json();
+          
+          document.getElementById('totalQueries').textContent = stats.totalQueries;
+          document.getElementById('uptime').textContent = stats.uptime;
+          document.getElementById('queriesPerHour').textContent = stats.queriesPerHour;
+          document.getElementById('recentQueries').textContent = stats.recentQueries;
+          
+          // Update character stats
+          const characterStatsDiv = document.getElementById('characterStats');
+          characterStatsDiv.innerHTML = '';
+          
+          Object.entries(stats.characterStats).forEach(([character, count]) => {
+            const characterItem = document.createElement('div');
+            characterItem.className = 'character-item';
+            characterItem.innerHTML = `
+              <span class="character-name">${character}</span>
+              <span class="character-count">${count} queries</span>
+            `;
+            characterStatsDiv.appendChild(characterItem);
+          });
+        } else if (response.status === 401) {
+          logout();
+        }
+      } catch (err) {
+        console.error('Error loading stats:', err);
+      }
+      
+      // Load query history
+      await loadQueryHistory();
+      
+      // Load service status
+      await loadServiceStatus();
+    }
+
+    async function loadQueryHistory() {
+      if (!adminToken) return;
+      
+      try {
+        const response = await fetch('/api/admin/queries', {
+          headers: {
+            'Authorization': 'Bearer ' + adminToken
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          
+          const queriesDiv = document.getElementById('recentQueries');
+          queriesDiv.innerHTML = '';
+          
+          if (data.queries && data.queries.length > 0) {
+            data.queries.reverse().forEach(query => {
+              const queryItem = document.createElement('div');
+              queryItem.className = 'query-item';
+              queryItem.innerHTML = `
+                <div class="query-text">"${query.query}"</div>
+                <div class="query-meta">
+                  <span class="query-character">${query.character}</span>
+                  <span class="query-time">${query.time}</span>
+                </div>
+              `;
+              queriesDiv.appendChild(queryItem);
+            });
+          } else {
+            queriesDiv.innerHTML = '<div style="text-align: center; color: #666; padding: 1rem;">No recent queries</div>';
+          }
+        }
+      } catch (err) {
+        console.error('Error loading query history:', err);
+      }
+    }
+
+    async function loadServiceStatus() {
+      if (!adminToken) return;
+      
+      try {
+        const response = await fetch('/api/admin/status', {
+          headers: {
+            'Authorization': 'Bearer ' + adminToken
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          updateServiceStatus(data.paused);
+        }
+      } catch (err) {
+        console.error('Error loading service status:', err);
+      }
+    }
+
+    function startRefresh() {
+      refreshInterval = setInterval(loadStats, 5000); // Refresh every 5 seconds
+    }
+
+    async function toggleServices() {
+      if (!adminToken) return;
+      
+      try {
+        // First check current status
+        const statusResponse = await fetch('/api/admin/status', {
+          headers: {
+            'Authorization': 'Bearer ' + adminToken
+          }
+        });
+        
+        if (statusResponse.ok) {
+          const status = await statusResponse.json();
+          
+          // Toggle based on current status
+          const endpoint = status.paused ? '/api/admin/unpause' : '/api/admin/pause';
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Authorization': 'Bearer ' + adminToken,
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            updateServiceStatus(data.paused);
+          }
+        }
+      } catch (err) {
+        console.error('Error toggling services:', err);
+      }
+    }
+
+    function updateServiceStatus(paused) {
+      const statusDiv = document.getElementById('serviceStatus');
+      const pauseBtn = document.getElementById('pauseBtn');
+      
+      if (paused) {
+        statusDiv.innerHTML = '⏸️ Services Paused';
+        statusDiv.style.color = '#ff4500';
+        pauseBtn.innerHTML = '▶️ Resume Services';
+        pauseBtn.style.background = 'linear-gradient(135deg, #00ff7f, #00cc66)';
+      } else {
+        statusDiv.innerHTML = '✅ Services Running';
+        statusDiv.style.color = '#00ff7f';
+        pauseBtn.innerHTML = '⏸️ Pause Services';
+        pauseBtn.style.background = 'linear-gradient(135deg, #ff4500, #dc143c)';
+      }
+    }
+
+    // Allow Enter key to login
+    document.getElementById('passwordInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        login();
+      }
+    });
+  </script>
+</body>
+</html>

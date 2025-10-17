@@ -8,9 +8,12 @@ import fs from "fs";
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Global query counter
+// Global query counter and performance metrics
 let totalQueries = 0;
 const serverStartedAt = Date.now();
+const queryHistory = [];
+const recentQueries = []; // Store recent queries for admin view
+let servicesPaused = false; // Admin can pause all services
 
 // Setup file paths
 const __filename = fileURLToPath(import.meta.url);
@@ -48,6 +51,11 @@ app.post("/api/chat", async (req, res) => {
       return res.status(400).json({ error: "Missing prompt" });
     }
 
+    // Check if services are paused
+    if (servicesPaused) {
+      return res.status(503).json({ error: "Services are temporarily disabled for maintenance" });
+    }
+
     // Get character configuration
     const characterConfig = halloweenConfig.characters?.[character] || halloweenConfig.characters?.default;
     const settings = halloweenConfig.settings || {};
@@ -69,6 +77,21 @@ app.post("/api/chat", async (req, res) => {
 
     // Increment query counter
     totalQueries += 1;
+    queryHistory.push({ timestamp: Date.now(), character: character });
+    
+    // Store recent query for admin view (keep last 20)
+    recentQueries.push({
+      timestamp: Date.now(),
+      character: character,
+      query: prompt,
+      time: new Date().toLocaleTimeString()
+    });
+    
+    // Keep only last 20 queries
+    if (recentQueries.length > 20) {
+      recentQueries.shift();
+    }
+    
     res.setHeader('X-Total-Queries', String(totalQueries));
 
     // Setup streaming response
@@ -130,9 +153,122 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
+// Admin authentication (secure environment variable-based)
+const ADMIN_PASSWORD = process.env.SPOOKYGPT_ADMIN_PASSWORD;
+
+if (!ADMIN_PASSWORD) {
+  console.error('❌ SPOOKYGPT_ADMIN_PASSWORD environment variable is required');
+  process.exit(1);
+}
+
+let adminSessions = new Set();
+
+// Admin authentication middleware
+function requireAdmin(req, res, next) {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (adminSessions.has(token)) {
+    next();
+  } else {
+    res.status(401).json({ error: 'Admin access required' });
+  }
+}
+
+// Admin login endpoint
+app.post('/api/admin/login', (req, res) => {
+  const { password } = req.body;
+  if (password === ADMIN_PASSWORD) {
+    const token = Math.random().toString(36).substring(2) + Date.now().toString(36);
+    adminSessions.add(token);
+    res.json({ token, success: true });
+  } else {
+    res.status(401).json({ error: 'Invalid password' });
+  }
+});
+
+// Admin logout endpoint
+app.post('/api/admin/logout', requireAdmin, (req, res) => {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  adminSessions.delete(token);
+  res.json({ success: true });
+});
+
+// Admin stats endpoint (same as regular stats for now)
+app.get('/api/admin/stats', requireAdmin, (_req, res) => {
+  const uptime = Date.now() - serverStartedAt;
+  const uptimeHours = Math.floor(uptime / (1000 * 60 * 60));
+  const uptimeMinutes = Math.floor((uptime % (1000 * 60 * 60)) / (1000 * 60));
+  const uptimeSeconds = Math.floor((uptime % (1000 * 60)) / 1000);
+  
+  const queriesPerHour = uptimeHours > 0 ? Math.round(totalQueries / uptimeHours) : totalQueries;
+  
+  const tenMinutesAgo = Date.now() - (10 * 60 * 1000);
+  const recentQueries = queryHistory.filter(q => q.timestamp > tenMinutesAgo).length;
+  
+  const characterStats = {};
+  queryHistory.forEach(q => {
+    characterStats[q.character] = (characterStats[q.character] || 0) + 1;
+  });
+  
+  res.json({ 
+    totalQueries, 
+    serverStartedAt,
+    uptime: `${uptimeHours}h ${uptimeMinutes}m ${uptimeSeconds}s`,
+    queriesPerHour,
+    recentQueries,
+    characterStats
+  });
+});
+
+// Admin query history endpoint
+app.get('/api/admin/queries', requireAdmin, (_req, res) => {
+  res.json({ 
+    queries: recentQueries.slice(-10) // Last 10 queries
+  });
+});
+
+// Admin pause/unpause services endpoint
+app.post('/api/admin/pause', requireAdmin, (req, res) => {
+  servicesPaused = true;
+  res.json({ success: true, message: 'Services paused', paused: true });
+});
+
+app.post('/api/admin/unpause', requireAdmin, (req, res) => {
+  servicesPaused = false;
+  res.json({ success: true, message: 'Services resumed', paused: false });
+});
+
+app.get('/api/admin/status', requireAdmin, (_req, res) => {
+  res.json({ paused: servicesPaused });
+});
+
 // API endpoints
 app.get('/api/stats', (_req, res) => {
-  res.json({ totalQueries, serverStartedAt });
+  const uptime = Date.now() - serverStartedAt;
+  const uptimeHours = Math.floor(uptime / (1000 * 60 * 60));
+  const uptimeMinutes = Math.floor((uptime % (1000 * 60 * 60)) / (1000 * 60));
+  const uptimeSeconds = Math.floor((uptime % (1000 * 60)) / 1000);
+  
+  // Calculate queries per hour
+  const queriesPerHour = uptimeHours > 0 ? Math.round(totalQueries / uptimeHours) : totalQueries;
+  
+  // Get recent activity (last 10 minutes)
+  const tenMinutesAgo = Date.now() - (10 * 60 * 1000);
+  const recentQueries = queryHistory.filter(q => q.timestamp > tenMinutesAgo).length;
+  
+  // Character usage stats
+  const characterStats = {};
+  queryHistory.forEach(q => {
+    characterStats[q.character] = (characterStats[q.character] || 0) + 1;
+  });
+  
+  res.json({ 
+    totalQueries, 
+    serverStartedAt,
+    uptime: `${uptimeHours}h ${uptimeMinutes}m ${uptimeSeconds}s`,
+    queriesPerHour,
+    recentQueries,
+    characterStats
+  });
 });
 
 app.get("/api/characters", (req, res) => {
