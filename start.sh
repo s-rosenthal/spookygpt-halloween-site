@@ -12,6 +12,9 @@ function cleanup {
     if ps -p $NGROK_PID > /dev/null; then
         kill $NGROK_PID
     fi
+    if ps -p $CAFFEINATE_PID > /dev/null; then
+        kill $CAFFEINATE_PID
+    fi
     exit 0
 }
 
@@ -36,6 +39,11 @@ echo "✅ Docker image rebuilt successfully"
 echo "👻 Starting Ollama..."
 ollama serve &
 OLLAMA_PID=$!
+
+# Prevent laptop from sleeping
+echo "🔋 Preventing laptop sleep..."
+caffeinate -d -i -m -u &
+CAFFEINATE_PID=$!
 
 # Start Docker container with optimized settings
 echo "🐳 Starting SpookyGPT container..."
@@ -66,6 +74,7 @@ if [ -n "$NGROK_URL" ]; then
     echo "👻 Visit the URL above to start chatting!"
     echo "📱 No login required - just start chatting!"
     echo "📊 Global query counter enabled"
+    echo "🔋 Laptop sleep prevented - SpookyGPT will stay running!"
     echo ""
     echo "🔧 Admin Panel:"
     echo "   • Visit $NGROK_URL/admin.html for admin dashboard"
