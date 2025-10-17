@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# 🎃 Halloween ESP32 LED Controller - Easy Flash Script
-# This script automates building and flashing your ESP32-C3
+# 🎃 ESP32 Halloween LED Controller - Easy Flash Script
+# This script makes flashing your ESP32 super easy!
 
 set -e  # Exit on any error
 
@@ -44,64 +44,59 @@ print_error() {
 # Check if PlatformIO is installed
 check_platformio() {
     print_status "Checking PlatformIO installation..."
-    if ! command -v pio &> /dev/null; then
-        print_error "PlatformIO is not installed!"
-        print_status "Installing PlatformIO via Homebrew..."
-        brew install platformio
-        print_success "PlatformIO installed successfully!"
-    else
+    
+    if command -v pio &> /dev/null; then
         print_success "PlatformIO is already installed!"
+        return 0
+    else
+        print_error "PlatformIO is not installed!"
+        print_status "Installing PlatformIO..."
+        
+        # Install PlatformIO via pip
+        if command -v pip3 &> /dev/null; then
+            pip3 install platformio
+        elif command -v pip &> /dev/null; then
+            pip install platformio
+        else
+            print_error "pip not found! Please install Python and pip first."
+            print_status "Visit: https://docs.platformio.org/en/latest/core/installation.html"
+            exit 1
+        fi
+        
+        print_success "PlatformIO installed successfully!"
     fi
 }
 
-# Check if ESP32 platform is installed
+# Check ESP32 platform
 check_esp32_platform() {
     print_status "Checking ESP32 platform..."
-    if ! pio platform show espressif32 &> /dev/null; then
+    
+    if pio platform show espressif32 &> /dev/null; then
+        print_success "ESP32 platform is ready!"
+    else
         print_status "Installing ESP32 platform..."
         pio platform install espressif32
         print_success "ESP32 platform installed!"
-    else
-        print_success "ESP32 platform is ready!"
     fi
 }
 
-# Check if required libraries are installed
+# Check required libraries
 check_libraries() {
     print_status "Checking required libraries..."
     
-    # Check if libraries are already installed
+    # Check if lib_deps are installed
     if [ -d ".pio/libdeps" ]; then
         print_success "Libraries are already installed!"
-        return
-    fi
-    
-    print_status "Installing required libraries..."
-    pio lib install "fastled/FastLED@^3.6.0" "bblanchon/ArduinoJson@^6.21.3"
-    print_success "Libraries installed successfully!"
-}
-
-# Build the project
-build_project() {
-    print_status "Building ESP32 project..."
-    echo ""
-    
-    if pio run; then
-        print_success "Build completed successfully!"
-        echo ""
-        return 0
     else
-        print_error "Build failed!"
-        return 1
+        print_status "Installing required libraries..."
+        pio lib install
+        print_success "Libraries installed!"
     fi
 }
 
-# Flash the ESP32
-flash_esp32() {
-    print_status "Looking for ESP32-C3 device..."
-    
-    # Try to find the ESP32 device
-    DEVICE=""
+# Find ESP32 device
+find_esp32_device() {
+    print_status "Looking for ESP32 device..."
     
     # Common ESP32 device paths on macOS
     for path in /dev/tty.usbserial-* /dev/tty.usbmodem* /dev/ttyUSB* /dev/cu.usbserial-* /dev/cu.usbmodem*; do
@@ -112,39 +107,53 @@ flash_esp32() {
     done
     
     if [ -z "$DEVICE" ]; then
-        print_warning "No ESP32 device found automatically."
-        print_status "Please connect your ESP32-C3 via USB and try again."
-        print_status "Or specify the device path manually:"
-        echo ""
-        echo "Usage: $0 [device_path]"
-        echo "Example: $0 /dev/tty.usbserial-0001"
-        echo ""
+        print_error "No ESP32 device found!"
+        print_status "Make sure your ESP32 is connected via USB"
+        print_status "Try:"
+        print_status "  - Unplugging and reconnecting the ESP32"
+        print_status "  - Using a different USB cable"
+        print_status "  - Checking if drivers are installed"
         return 1
     fi
     
     print_success "Found ESP32 device: $DEVICE"
+    return 0
+}
+
+# Build the project
+build_project() {
+    print_status "Building ESP32 project..."
     
-    # Update platformio.ini with the detected device
-    print_status "Updating device configuration..."
-    sed -i.bak "s|upload_port = .*|upload_port = $DEVICE|" platformio.ini
+    if pio run; then
+        print_success "Build completed successfully!"
+        return 0
+    else
+        print_error "Build failed!"
+        print_status "Check the error messages above for details"
+        return 1
+    fi
+}
+
+# Flash ESP32
+flash_esp32() {
+    print_status "Flashing ESP32..."
     
-    print_status "Flashing ESP32-C3..."
-    echo ""
+    # Update upload port in platformio.ini if device was found
+    if [ ! -z "$DEVICE" ]; then
+        print_status "Updating upload port to: $DEVICE"
+        sed -i.bak "s|upload_port = .*|upload_port = $DEVICE|" platformio.ini
+    fi
     
     if pio run --target upload; then
         print_success "ESP32 flashed successfully! 🎃✨"
-        echo ""
-        print_status "Your Halloween LED controller is ready!"
-        print_status "Connect your LED strip to GPIO pin 2"
-        print_status "Update WiFi credentials in src/main.cpp"
-        echo ""
         return 0
     else
-        print_error "Flash failed!"
-        print_status "Make sure:"
-        print_status "  - ESP32-C3 is connected via USB"
-        print_status "  - Device is in bootloader mode (hold BOOT button while pressing RESET)"
-        print_status "  - Correct drivers are installed"
+        print_error "Failed to flash ESP32."
+        print_status "Troubleshooting tips:"
+        print_status "  - Make sure ESP32 is connected"
+        print_status "  - Try pressing the BOOT button while flashing"
+        print_status "  - Check USB cable (use data cable, not just charging)"
+        print_status "  - Try different USB port"
         return 1
     fi
 }
@@ -160,8 +169,7 @@ open_monitor() {
         mv platformio.ini.bak platformio.ini
     fi
     
-    # Use our custom monitor script
-    ./monitor_serial.sh "$DEVICE"
+    pio device monitor --baud 115200
 }
 
 # Main function
@@ -170,21 +178,27 @@ main() {
     if [ $# -eq 1 ]; then
         DEVICE="$1"
         print_status "Using specified device: $DEVICE"
-        # Update platformio.ini with the specified device
-        sed -i.bak "s|upload_port = .*|upload_port = $DEVICE|" platformio.ini
+        
+        # Verify device exists
+        if [ ! -e "$DEVICE" ]; then
+            print_error "Device $DEVICE does not exist!"
+            exit 1
+        fi
+    else
+        # Auto-detect device
+        if ! find_esp32_device; then
+            exit 1
+        fi
     fi
     
-    # Run all checks and build
+    # Check requirements
     check_platformio
     check_esp32_platform
     check_libraries
     
+    # Build project
     if build_project; then
         echo ""
-        print_status "Build successful! Ready to flash."
-        echo ""
-        
-        # Ask user if they want to flash
         read -p "Do you want to flash the ESP32 now? (y/n): " -n 1 -r
         echo ""
         
@@ -197,39 +211,17 @@ main() {
                 if [[ $REPLY =~ ^[Yy]$ ]]; then
                     open_monitor
                 else
-                    print_success "Flash complete! Run './monitor_serial.sh' to see debug output."
+                    print_success "Flash complete! Connect to serial monitor to see debug output."
                 fi
             fi
         else
             print_status "Build complete! Run '$0' again to flash when ready."
         fi
     else
-        print_error "Build failed. Please check the errors above."
+        print_error "Build failed. Please fix the errors and try again."
         exit 1
     fi
 }
-
-# Show help if requested
-if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-    echo "🎃 Halloween ESP32 LED Controller - Easy Flash Script"
-    echo ""
-    echo "Usage:"
-    echo "  $0                    # Auto-detect device and flash"
-    echo "  $0 [device_path]      # Specify device path manually"
-    echo "  $0 -h, --help        # Show this help"
-    echo ""
-    echo "Examples:"
-    echo "  $0"
-    echo "  $0 /dev/tty.usbserial-0001"
-    echo "  $0 /dev/cu.usbmodem1234567890"
-    echo ""
-    echo "Before flashing:"
-    echo "  1. Connect ESP32-C3 via USB"
-    echo "  2. Update WiFi credentials in src/main.cpp"
-    echo "  3. Connect LED strip to GPIO pin 2"
-    echo ""
-    exit 0
-fi
 
 # Run main function
 main "$@"

@@ -1,124 +1,116 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
-#include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
 #include <FastLED.h>
 
-// ============================================================================
-// CONFIGURATION - Modify these values for your setup
-// ============================================================================
+// Configuration - Update these for your setup
+#define WIFI_SSID "Simon"        // Change to your phone's hotspot name
+#define WIFI_PASSWORD "Monkey123"        // Change to your hotspot password
+#define API_URL "https://treasa-apterygial-magdalen.ngrok-free.dev/api/status"  // Change to your actual URL
 
-// WiFi credentials (your phone's hotspot)
-const char* WIFI_SSID = "Simon";
-const char* WIFI_PASSWORD = "Monkey123";
+// LED Configuration
+#define LED_PIN 8                           // Built-in LED pin for ESP32-C3
+#define LED_STRIP_PIN 2                     // Pin for external LED strip
+#define NUM_LEDS 50                         // Number of LEDs in your strip
+#define LED_TYPE WS2812B                    // LED strip type
+#define COLOR_ORDER GRB                     // Color order for your strip
 
-// API endpoint URL (replace with your actual domain)
-const char* API_URL = "https://treasa-apterygial-magdalen.ngrok-free.dev/api/status";
+// Global variables
+CRGB leds[NUM_LEDS];
+bool wifiConnected = false;
+int lastQueryCount = 0;
+unsigned long lastApiCall = 0;
+const unsigned long API_INTERVAL = 5000;    // Check every 5 seconds
 
-// LED strip configuration
-#define LED_PIN 2           // GPIO pin connected to LED strip data line
-#define NUM_LEDS 50         // Number of LEDs in your strip
-#define LED_TYPE WS2812B    // LED strip type
-#define COLOR_ORDER GRB     // Color order for your LEDs
-
-// Timing configuration
-const unsigned long POLL_INTERVAL = 8000;  // Poll API every 8 seconds
-const unsigned long LED_DURATION = 3000;   // Keep LEDs on for 3 seconds
-
-// ============================================================================
-// FUNCTION DECLARATIONS
-// ============================================================================
-
+// Function declarations
 void connectToWiFi();
 void scanWiFiNetworks();
-void pollAPI();
-void parseAPIResponse(String jsonString);
-void startupLEDSequence();
-void activateLEDs();
-void handleLEDEffects();
-void turnOffLEDs();
-void printStatus();
-
-// ============================================================================
-// GLOBAL VARIABLES
-// ============================================================================
-
-CRGB leds[NUM_LEDS];
-unsigned long lastPollTime = 0;
-unsigned long ledStartTime = 0;
-int lastQueryCount = 0;
-bool ledsActive = false;
-bool wifiConnected = false;
-
-// ============================================================================
-// SETUP FUNCTION
-// ============================================================================
+void checkApiStatus();
+void lightUpLEDs();
+void setStatusLED(bool connected);
 
 void setup() {
   // Initialize serial communication
   Serial.begin(115200);
-  Serial.println();
-  Serial.println("🎃 Halloween LED Controller Starting...");
-  Serial.println("=====================================");
   
-  // Initialize LED strip
-  FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS);
-  FastLED.setBrightness(100); // Start with moderate brightness
-  
-  // Show startup sequence
-  startupLEDSequence();
-  
-  // Connect to WiFi
-  connectToWiFi();
-  
-  // If WiFi failed, scan for available networks
-  if (!wifiConnected) {
-    scanWiFiNetworks();
+  // Wait for serial port to connect (important for ESP32-C3)
+  while (!Serial) {
+    delay(10);
   }
   
-  Serial.println("✅ Setup complete! Starting main loop...");
+  delay(1000); // Give extra time for serial to stabilize
+  
   Serial.println();
+  Serial.println("🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃");
+  Serial.println("🎃                                                              🎃");
+  Serial.println("🎃              HALLOWEEN COSTUME ESP32                          🎃");
+  Serial.println("🎃                   LED Controller                              🎃");
+  Serial.println("🎃                                                              🎃");
+  Serial.println("🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃");
+  Serial.println();
+  
+  // Configure built-in LED
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(LED_PIN, LOW);
+  
+  // Initialize LED strip
+  FastLED.addLeds<LED_TYPE, LED_STRIP_PIN, COLOR_ORDER>(leds, NUM_LEDS);
+  FastLED.setBrightness(50); // Start with lower brightness
+  FastLED.clear();
+  FastLED.show();
+  
+  Serial.println("🔧 Hardware initialized:");
+  Serial.println("   ✅ Built-in LED (Status indicator)");
+  Serial.println("   ✅ LED Strip (WS2812B)");
+  Serial.println("   ✅ Serial communication");
+  Serial.println();
+  
+  // Connect to WiFi
+  Serial.println("📡 Starting WiFi connection...");
+  connectToWiFi();
+  
+  if (wifiConnected) {
+    Serial.println("🎉 Setup complete! Ready to monitor your website!");
+    setStatusLED(true); // Solid LED when connected
+  } else {
+    Serial.println("⚠️  Setup complete but WiFi not connected. Will retry...");
+    setStatusLED(false); // Blinking LED when not connected
+  }
+  
+  Serial.println();
+  Serial.println("🔄 Starting main loop...");
+  Serial.println("═══════════════════════════════════════════════════════════════");
 }
 
-// ============================================================================
-// MAIN LOOP
-// ============================================================================
-
 void loop() {
-  // Check WiFi connection
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("❌ WiFi disconnected! Attempting to reconnect...");
-    wifiConnected = false;
-    connectToWiFi();
+  static unsigned long lastWiFiRetry = 0;
+  const unsigned long WIFI_RETRY_INTERVAL = 30000; // Retry WiFi every 30 seconds
+  
+  // Check WiFi connection status
+  if (!wifiConnected || WiFi.status() != WL_CONNECTED) {
+    if (millis() - lastWiFiRetry > WIFI_RETRY_INTERVAL) {
+      Serial.println();
+      Serial.println("🔄 WiFi disconnected! Attempting to reconnect...");
+      lastWiFiRetry = millis();
+      connectToWiFi();
+    }
+    setStatusLED(false); // Keep blinking if not connected
+    delay(1000);
     return;
   }
   
-  // Poll API at regular intervals
-  if (millis() - lastPollTime >= POLL_INTERVAL) {
-    pollAPI();
-    lastPollTime = millis();
+  // WiFi is connected, turn LED solid
+  setStatusLED(true);
+  
+  // Check API status every 5 seconds
+  if (millis() - lastApiCall > API_INTERVAL) {
+    checkApiStatus();
+    lastApiCall = millis();
   }
   
-  // Handle LED effects
-  if (ledsActive) {
-    handleLEDEffects();
-    
-    // Turn off LEDs after duration
-    if (millis() - ledStartTime >= LED_DURATION) {
-      turnOffLEDs();
-      ledsActive = false;
-      Serial.println("💡 LEDs turned off");
-    }
-  }
-  
-  // Small delay to prevent overwhelming the system
   delay(100);
 }
-
-// ============================================================================
-// WIFI FUNCTIONS
-// ============================================================================
 
 void connectToWiFi() {
   Serial.print("📡 Connecting to WiFi: ");
@@ -131,8 +123,18 @@ void connectToWiFi() {
   // Set WiFi mode to station
   WiFi.mode(WIFI_STA);
   
-  // Begin connection
+  // Try alternative connection method for iPhone hotspots
+  Serial.println("   Trying alternative connection method...");
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  
+  // Wait a bit and try again if first attempt fails
+  delay(3000);
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("   First attempt failed, trying again...");
+    WiFi.disconnect();
+    delay(1000);
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  }
   
   int attempts = 0;
   while (WiFi.status() != WL_CONNECTED && attempts < 30) {
@@ -140,13 +142,17 @@ void connectToWiFi() {
     Serial.print(".");
     attempts++;
     
-    // Print status every 5 attempts
-    if (attempts % 5 == 0) {
+    // Blink LED while connecting
+    setStatusLED(false);
+    
+    // Print detailed status every 3 attempts
+    if (attempts % 3 == 0) {
       Serial.println();
       Serial.print("   Attempt ");
       Serial.print(attempts);
       Serial.print("/30 - Status: ");
-      switch(WiFi.status()) {
+      wl_status_t status = WiFi.status();
+      switch(status) {
         case WL_NO_SSID_AVAIL:
           Serial.println("NO_SSID_AVAIL (Network not found)");
           break;
@@ -159,10 +165,22 @@ void connectToWiFi() {
         case WL_DISCONNECTED:
           Serial.println("DISCONNECTED");
           break;
+        case WL_IDLE_STATUS:
+          Serial.println("IDLE");
+          break;
+        case WL_SCAN_COMPLETED:
+          Serial.println("SCAN_COMPLETED");
+          break;
         default:
-          Serial.println("CONNECTING...");
+          Serial.print("CONNECTING (Status: ");
+          Serial.print(status);
+          Serial.println(")");
           break;
       }
+      
+      // Print MAC address for debugging
+      Serial.print("   MAC: ");
+      Serial.println(WiFi.macAddress());
     }
   }
   
@@ -177,6 +195,7 @@ void connectToWiFi() {
     Serial.println(" dBm");
     Serial.print("📡 Gateway: ");
     Serial.println(WiFi.gatewayIP());
+    Serial.println("🎉 Ready to monitor your website!");
   } else {
     Serial.println();
     Serial.println("❌ Failed to connect to WiFi!");
@@ -186,21 +205,25 @@ void connectToWiFi() {
     Serial.println("   3. Try renaming hotspot (no spaces)");
     Serial.println("   4. Move ESP32 closer to phone");
     Serial.println("   5. Restart iPhone hotspot");
+    
+    // Scan for available networks
+    scanWiFiNetworks();
   }
 }
 
 void scanWiFiNetworks() {
+  Serial.println();
   Serial.println("🔍 Scanning for available WiFi networks...");
+  int networksFound = WiFi.scanNetworks();
   
-  int n = WiFi.scanNetworks();
-  if (n == 0) {
-    Serial.println("   No networks found");
+  if (networksFound == 0) {
+    Serial.println("   No networks found!");
   } else {
     Serial.print("   Found ");
-    Serial.print(n);
+    Serial.print(networksFound);
     Serial.println(" networks:");
     
-    for (int i = 0; i < n; ++i) {
+    for (int i = 0; i < networksFound; i++) {
       Serial.print("   ");
       Serial.print(i + 1);
       Serial.print(": ");
@@ -208,163 +231,106 @@ void scanWiFiNetworks() {
       Serial.print(" (");
       Serial.print(WiFi.RSSI(i));
       Serial.print(" dBm) ");
-      Serial.println((WiFi.encryptionType(i) == WIFI_AUTH_OPEN) ? "Open" : "Encrypted");
+      Serial.println(WiFi.encryptionType(i) == WIFI_AUTH_OPEN ? "[OPEN]" : "[SECURED]");
     }
   }
-  Serial.println();
 }
 
-// ============================================================================
-// API FUNCTIONS
-// ============================================================================
-
-void pollAPI() {
-  if (!wifiConnected) {
-    Serial.println("⚠️  Skipping API poll - WiFi not connected");
-    return;
-  }
+void checkApiStatus() {
+  if (!wifiConnected) return;
   
-  Serial.print("🔍 Polling API: ");
-  Serial.println(API_URL);
+  Serial.print("🌐 Checking API status... ");
   
   HTTPClient http;
-  WiFiClientSecure client;
-  
-  // Configure HTTPS client (skip certificate verification for simplicity)
-  client.setInsecure();
-  
-  http.begin(client, API_URL);
+  http.begin(API_URL);
   http.setTimeout(10000); // 10 second timeout
   
-  int httpResponseCode = http.GET();
+  int httpCode = http.GET();
   
-  if (httpResponseCode > 0) {
-    String response = http.getString();
-    Serial.print("📊 API Response (");
-    Serial.print(httpResponseCode);
-    Serial.print("): ");
-    Serial.println(response);
-    
-    // Parse JSON response
-    parseAPIResponse(response);
-    
+  if (httpCode > 0) {
+    if (httpCode == HTTP_CODE_OK) {
+      String payload = http.getString();
+      Serial.println("✅ Success!");
+      
+      // Parse JSON response
+      DynamicJsonDocument doc(1024);
+      DeserializationError error = deserializeJson(doc, payload);
+      
+      if (error) {
+        Serial.print("❌ JSON parsing failed: ");
+        Serial.println(error.c_str());
+        http.end();
+        return;
+      }
+      
+      int totalQueries = doc["totalQueries"];
+      bool ledsEnabled = doc["ledsEnabled"];
+      
+      Serial.print("📊 Total queries: ");
+      Serial.println(totalQueries);
+      Serial.print("💡 LEDs enabled: ");
+      Serial.println(ledsEnabled ? "YES" : "NO");
+      
+      // Check if we have a new query
+      if (totalQueries > lastQueryCount && ledsEnabled) {
+        Serial.println("🎉 NEW QUERY DETECTED! Lighting up LEDs!");
+        lightUpLEDs();
+        lastQueryCount = totalQueries;
+      } else if (totalQueries > lastQueryCount && !ledsEnabled) {
+        Serial.println("📝 New query detected but LEDs are disabled");
+        lastQueryCount = totalQueries;
+      } else {
+        Serial.println("⏳ No new queries");
+      }
+      
+    } else {
+      Serial.print("❌ HTTP error: ");
+      Serial.println(httpCode);
+    }
   } else {
-    Serial.print("❌ API request failed with code: ");
-    Serial.println(httpResponseCode);
-    Serial.print("   Error: ");
-    Serial.println(http.errorToString(httpResponseCode));
+    Serial.print("❌ Connection failed: ");
+    Serial.println(http.errorToString(httpCode));
   }
   
   http.end();
 }
 
-void parseAPIResponse(String jsonString) {
-  // Parse JSON using ArduinoJson
-  DynamicJsonDocument doc(1024);
-  DeserializationError error = deserializeJson(doc, jsonString);
+void lightUpLEDs() {
+  Serial.println("🌈 Starting LED animation...");
   
-  if (error) {
-    Serial.print("❌ JSON parsing failed: ");
-    Serial.println(error.c_str());
-    return;
-  }
+  // Halloween colors
+  CRGB colors[] = {CRGB::Orange, CRGB::Purple, CRGB::Red, CRGB::Green};
   
-  int currentQueryCount = doc["totalQueries"];
-  bool ledsEnabled = doc["ledsEnabled"];
-  
-  Serial.print("📈 Total queries: ");
-  Serial.println(currentQueryCount);
-  Serial.print("💡 LEDs enabled: ");
-  Serial.println(ledsEnabled ? "YES" : "NO");
-  
-  // Check if we have a new query and LEDs are enabled
-  if (currentQueryCount > lastQueryCount && ledsEnabled) {
-    Serial.println("🎉 NEW QUERY DETECTED! Lighting up LEDs!");
-    activateLEDs();
-    lastQueryCount = currentQueryCount;
-  } else if (currentQueryCount > lastQueryCount && !ledsEnabled) {
-    Serial.println("📝 New query detected, but LEDs are disabled");
-    lastQueryCount = currentQueryCount;
-  } else {
-    Serial.println("😴 No new queries");
-  }
-}
-
-// ============================================================================
-// LED FUNCTIONS
-// ============================================================================
-
-void startupLEDSequence() {
-  Serial.println("💡 Running startup LED sequence...");
-  
-  // Rainbow wave effect
-  for (int i = 0; i < NUM_LEDS; i++) {
-    leds[i] = CHSV(i * 255 / NUM_LEDS, 255, 255);
-    FastLED.show();
-    delay(50);
-  }
-  
-  // Flash white
-  fill_solid(leds, NUM_LEDS, CRGB::White);
-  FastLED.show();
-  delay(200);
-  
-  // Turn off
-  fill_solid(leds, NUM_LEDS, CRGB::Black);
-  FastLED.show();
-  
-  Serial.println("✅ Startup sequence complete");
-}
-
-void activateLEDs() {
-  ledsActive = true;
-  ledStartTime = millis();
-  Serial.println("🎃 Activating Halloween LED effects!");
-}
-
-void handleLEDEffects() {
-  unsigned long elapsed = millis() - ledStartTime;
-  
-  // Different effects based on elapsed time
-  if (elapsed < 1000) {
-    // First second: Orange flash
-    fill_solid(leds, NUM_LEDS, CRGB::Orange);
-    FastLED.show();
-  } else if (elapsed < 2000) {
-    // Second second: Purple wave
+  // Animate LEDs for 3 seconds
+  for (int cycle = 0; cycle < 6; cycle++) {
     for (int i = 0; i < NUM_LEDS; i++) {
-      int hue = (i * 255 / NUM_LEDS + millis() / 10) % 255;
-      leds[i] = CHSV(hue, 255, 200);
+      leds[i] = colors[cycle % 4];
     }
     FastLED.show();
-  } else {
-    // Third second: Red pulsing
-    int brightness = 128 + 127 * sin(millis() / 100.0);
-    fill_solid(leds, NUM_LEDS, CRGB(brightness, 0, 0));
+    delay(500);
+    
+    // Clear LEDs
+    FastLED.clear();
     FastLED.show();
+    delay(500);
   }
+  
+  Serial.println("✨ LED animation complete!");
 }
 
-void turnOffLEDs() {
-  fill_solid(leds, NUM_LEDS, CRGB::Black);
-  FastLED.show();
-}
-
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
-
-void printStatus() {
-  Serial.println();
-  Serial.println("📊 Current Status:");
-  Serial.print("   WiFi: ");
-  Serial.println(wifiConnected ? "Connected" : "Disconnected");
-  Serial.print("   Last query count: ");
-  Serial.println(lastQueryCount);
-  Serial.print("   LEDs active: ");
-  Serial.println(ledsActive ? "YES" : "NO");
-  Serial.print("   Uptime: ");
-  Serial.print(millis() / 1000);
-  Serial.println(" seconds");
-  Serial.println();
+void setStatusLED(bool connected) {
+  static unsigned long lastBlink = 0;
+  static bool ledState = false;
+  
+  if (connected) {
+    // Solid LED when connected
+    digitalWrite(LED_PIN, HIGH);
+  } else {
+    // Blinking LED when not connected
+    if (millis() - lastBlink > 500) {
+      lastBlink = millis();
+      ledState = !ledState;
+      digitalWrite(LED_PIN, ledState);
+    }
+  }
 }
