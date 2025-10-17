@@ -7,104 +7,119 @@ const musicToggle = document.getElementById("musicToggle");
 const backgroundMusic = document.getElementById("backgroundMusic");
 const permissionOverlay = document.getElementById("permissionOverlay");
 const allowMusicBtn = document.getElementById("allowMusicBtn");
-const queryCounterEl = document.getElementById("queryCounter");
-const queryCountEl = document.getElementById("queryCount");
 const sessionCountEl = document.getElementById("sessionCount");
+const cooldownDisplayEl = document.getElementById("cooldownDisplay");
+const cooldownTimerEl = document.getElementById("cooldownTimer");
 
 let currentCharacter = "default";
 let characters = {};
-let isMusicPlaying = false; // Start as "off" until permission granted
-// Sessions removed; no per-user tracking
-let sessionId = null;
-let sessionStartTime = Date.now();
+let isMusicPlaying = false;
+let cooldownActive = false;
+let cooldownEndTime = 0;
+let cooldownInterval = null;
+
+// Cooldown system
+function startCooldown() {
+  cooldownActive = true;
+  cooldownEndTime = Date.now() + 15000; // 15 seconds
+  sessionStorage.setItem('spookygpt_cooldown_end', String(cooldownEndTime));
+  
+  cooldownDisplayEl.style.display = 'block';
+  input.disabled = true;
+  input.placeholder = "Cooldown active...";
+  
+  // Hide the send button during cooldown
+  sendBtn.style.display = 'none';
+  
+  cooldownInterval = setInterval(() => {
+    const remaining = Math.ceil((cooldownEndTime - Date.now()) / 1000);
+    if (remaining <= 0) {
+      endCooldown();
+    } else {
+      cooldownTimerEl.textContent = remaining;
+    }
+  }, 1000);
+}
+
+function endCooldown() {
+  cooldownActive = false;
+  sessionStorage.removeItem('spookygpt_cooldown_end');
+  
+  cooldownDisplayEl.style.display = 'none';
+  input.disabled = false;
+  input.placeholder = "Ask something spooky...";
+  
+  // Show the send button again after cooldown
+  sendBtn.style.display = 'block';
+  
+  if (cooldownInterval) {
+    clearInterval(cooldownInterval);
+    cooldownInterval = null;
+  }
+}
 
 // Cache system for each character
 let characterCache = {};
 
-// Initialize cache for a character
 function initializeCharacterCache(characterId) {
   if (!characterCache[characterId]) {
     characterCache[characterId] = {
       messages: [],
       responses: [],
-      maxSize: 5 // Only 5 messages and 5 responses (10 total)
+      maxSize: 5
     };
   }
 }
 
-// Add message to cache
 function addToMessageCache(characterId, message) {
   initializeCharacterCache(characterId);
   const cache = characterCache[characterId];
-  
   cache.messages.push(message);
-  
-  // Remove oldest if over limit
   if (cache.messages.length > cache.maxSize) {
     cache.messages.shift();
   }
 }
 
-// Add response to cache
 function addToResponseCache(characterId, response) {
   initializeCharacterCache(characterId);
   const cache = characterCache[characterId];
-  
   cache.responses.push(response);
-  
-  // Remove oldest if over limit
   if (cache.responses.length > cache.maxSize) {
     cache.responses.shift();
   }
 }
 
-// Get cached messages for context
 function getCachedMessages(characterId) {
   initializeCharacterCache(characterId);
   return characterCache[characterId].messages;
 }
 
-// Get cached responses for context
 function getCachedResponses(characterId) {
   initializeCharacterCache(characterId);
   return characterCache[characterId].responses;
 }
 
-// Clear cache when switching characters (optional - you can remove this if you want persistent cache)
-function clearCharacterCache(characterId) {
-  if (characterCache[characterId]) {
-    characterCache[characterId].messages = [];
-    characterCache[characterId].responses = [];
-  }
-}
-
 // Load available characters
 async function loadCharacters() {
   try {
-    // Load initial stats
-    try {
-      const statsRes = await fetch('/api/stats');
-      if (statsRes.ok) {
-        const stats = await statsRes.json();
-        if (queryCountEl && typeof stats.totalQueries === 'number') {
-          queryCountEl.textContent = String(stats.totalQueries);
-        }
-        // Initialize session counter from sessionStorage
-        const existingSessionCount = Number(sessionStorage.getItem('spookygpt_session_queries') || '0');
-        if (sessionCountEl) sessionCountEl.textContent = String(existingSessionCount);
-      }
-    } catch (_) {}
+    // Initialize session counter from sessionStorage
+    const existingSessionCount = Number(sessionStorage.getItem('spookygpt_session_queries') || '0');
+    if (sessionCountEl) sessionCountEl.textContent = String(existingSessionCount);
+    
+    // Check if cooldown is still active
+    const cooldownEnd = Number(sessionStorage.getItem('spookygpt_cooldown_end') || '0');
+    if (cooldownEnd > Date.now()) {
+      cooldownEndTime = cooldownEnd;
+      startCooldown();
+    }
 
     const res = await fetch("/api/characters");
     
-    // Check if server is full
     if (res.status === 503) {
       const data = await res.json();
       showServerFullMessage(data.error);
       return;
     }
-    
-    // No session header expected
     
     const data = await res.json();
     characters = data.characters;
@@ -131,13 +146,8 @@ async function loadCharacters() {
   }
 }
 
-// Generate a unique session ID
-// Session IDs no longer used
-function generateSessionId() { return ''; }
-
 // Show server full message
 function showServerFullMessage(message) {
-  // Hide all other content
   document.querySelector('.container').style.display = 'none';
   document.querySelector('.permission-overlay').style.display = 'none';
   
@@ -185,19 +195,85 @@ function showServerFullMessage(message) {
   document.body.appendChild(overlay);
 }
 
+// Sound system - disabled on mobile
+let soundEnabled = true;
+let audioContext;
+let soundEffects = {};
+
+function initSoundSystem() {
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  
+  if (isMobile) {
+    soundEnabled = false;
+    return;
+  }
+  
+  try {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    soundEffects = {
+      click: createTone(800, 0.1, 'sine'),
+      hover: createTone(600, 0.05, 'sine'),
+      send: createTone(1000, 0.2, 'square'),
+      receive: createTone(400, 0.3, 'triangle'),
+      error: createTone(200, 0.5, 'sawtooth')
+    };
+  } catch (e) {
+    soundEnabled = false;
+  }
+}
+
+function createTone(frequency, duration, type = 'sine') {
+  return () => {
+    if (!soundEnabled || !audioContext) return;
+    
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+    oscillator.type = type;
+    
+    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+    
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + duration);
+  };
+}
+
+function playSound(soundName) {
+  if (soundEffects[soundName]) {
+    soundEffects[soundName]();
+  }
+}
+
+// Message functions
 function appendMessage(role, text) {
   const msg = document.createElement("div");
   msg.className = "msg " + role;
   
+  msg.style.opacity = '0';
+  msg.style.transform = 'translateY(20px) scale(0.9)';
+  
   if (role === "bot") {
     msg.innerHTML = `<div class="msg-content">${text}</div>`;
+    playSound('receive');
   } else {
     msg.textContent = text;
+    playSound('send');
   }
   
-  // Append normally - newest messages at bottom
   chatBox.appendChild(msg);
-  chatBox.scrollTop = chatBox.scrollHeight; // Auto scroll to bottom to see newest messages
+  
+  requestAnimationFrame(() => {
+    msg.style.transition = 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
+    msg.style.opacity = '1';
+    msg.style.transform = 'translateY(0) scale(1)';
+  });
+  
+  chatBox.scrollTop = chatBox.scrollHeight;
   return msg;
 }
 
@@ -208,14 +284,31 @@ function updateMessage(msg, text) {
   } else {
     msg.textContent = text;
   }
-  chatBox.scrollTop = chatBox.scrollHeight; // Auto scroll to bottom to see newest messages
+  chatBox.scrollTop = chatBox.scrollHeight;
 }
 
+// Button effects
+function addButtonEffects() {
+  const buttons = document.querySelectorAll('button');
+  buttons.forEach(button => {
+    button.addEventListener('click', () => playSound('click'));
+    button.addEventListener('mouseenter', () => playSound('hover'));
+  });
+  
+  const selects = document.querySelectorAll('select');
+  selects.forEach(select => {
+    select.addEventListener('change', () => playSound('click'));
+    select.addEventListener('mouseenter', () => playSound('hover'));
+  });
+  
+  input.addEventListener('focus', () => playSound('hover'));
+}
+
+// Send message
 async function sendMessage() {
   const text = input.value.trim();
-  if (!text) return;
+  if (!text || cooldownActive) return;
 
-  // Add user message to cache
   addToMessageCache(currentCharacter, text);
   
   appendMessage("user", text);
@@ -223,10 +316,19 @@ async function sendMessage() {
   sendBtn.disabled = true;
   sendBtn.textContent = "Thinking...";
 
+  // Increment session counter
+  const newSessionCount = Number(sessionStorage.getItem('spookygpt_session_queries') || '0') + 1;
+  sessionStorage.setItem('spookygpt_session_queries', String(newSessionCount));
+  if (sessionCountEl) sessionCountEl.textContent = String(newSessionCount);
+
+  // Check if cooldown should start (every 5 messages: 5, 10, 15, 20, etc.)
+  if (newSessionCount % 5 === 0 && !cooldownActive) {
+    startCooldown();
+  }
+
   const thinkingMsg = appendMessage("bot", "💭 Thinking...");
 
   try {
-    // Get cached context for this character
     const cachedMessages = getCachedMessages(currentCharacter);
     const cachedResponses = getCachedResponses(currentCharacter);
     
@@ -245,19 +347,9 @@ async function sendMessage() {
 
     if (!res.ok) {
       updateMessage(thinkingMsg, `Error: ${res.statusText}`);
+      playSound('error');
       return;
     }
-
-    // Update query counter from header if present
-    const totalQueriesHeader = res.headers.get('X-Total-Queries');
-    if (totalQueriesHeader && queryCountEl) {
-      queryCountEl.textContent = totalQueriesHeader;
-    }
-
-    // Increment session counter and persist
-    const newSessionCount = Number(sessionStorage.getItem('spookygpt_session_queries') || '0') + 1;
-    sessionStorage.setItem('spookygpt_session_queries', String(newSessionCount));
-    if (sessionCountEl) sessionCountEl.textContent = String(newSessionCount);
 
     // Handle streaming response
     const reader = res.body.getReader();
@@ -272,18 +364,17 @@ async function sendMessage() {
 
       const chunk = decoder.decode(value);
       fullResponse += chunk;
-      updateMessage(thinkingMsg, fullResponse + "▋");
+      updateMessage(thinkingMsg, fullResponse);
       
-      // Minimal delay for typing effect
       await new Promise(resolve => setTimeout(resolve, 2));
     }
 
-    // Remove cursor and add response to cache
     updateMessage(thinkingMsg, fullResponse);
     addToResponseCache(currentCharacter, fullResponse);
 
   } catch (err) {
     updateMessage(thinkingMsg, "Network error: " + err.message);
+    playSound('error');
   } finally {
     sendBtn.disabled = false;
     sendBtn.textContent = "Send";
@@ -296,8 +387,15 @@ function clearChat() {
   appendMessage("bot", greeting);
 }
 
-// Permission and music functions
+// Music functions
+let permissionShown = false;
+
 function requestMusicPermission() {
+  // Show permission overlay by default on all devices
+  if (permissionOverlay && !permissionShown) {
+    permissionOverlay.style.display = 'flex';
+  }
+  
   if (allowMusicBtn) {
     allowMusicBtn.addEventListener('click', () => {
       startMusic();
@@ -322,6 +420,7 @@ function startMusic() {
 function hidePermissionOverlay() {
   if (permissionOverlay) {
     permissionOverlay.style.display = 'none';
+    permissionShown = true;
   }
 }
 
@@ -375,27 +474,5 @@ characterSelect.addEventListener("change", (e) => {
 loadCharacters();
 requestMusicPermission();
 updateMusicButton();
-
-// Auto-refresh after 5 minutes to clear session
-setTimeout(() => {
-  console.log("Session timeout reached (5 minutes). Refreshing page to clear session.");
-  location.reload();
-}, .5 * 60 * 1000); // 5 minutes
-
-// Notify server when user closes the page
-window.addEventListener('beforeunload', () => {
-  if (sessionId) {
-    // Send a request to notify server that user is leaving
-    navigator.sendBeacon('/api/session-end', JSON.stringify({ sessionId: sessionId }));
-    console.log(`Notifying server that session ${sessionId} is ending`);
-  }
-});
-
-// Also handle page visibility changes (tab switching, minimizing, etc.)
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden && sessionId) {
-    // User switched tabs or minimized window
-    console.log(`User became inactive for session ${sessionId}`);
-  }
-});
-
+initSoundSystem();
+addButtonEffects();
