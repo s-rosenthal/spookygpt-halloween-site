@@ -280,6 +280,14 @@ app.get("/api/characters", (req, res) => {
   res.json({ characters });
 });
 
+// LED status endpoint for ESP32
+app.get("/api/status", (_req, res) => {
+  res.json({ 
+    totalQueries,
+    ledsEnabled: !servicesPaused // LEDs enabled when services are not paused
+  });
+});
+
 // Fallback route
 app.get("*", (_, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
