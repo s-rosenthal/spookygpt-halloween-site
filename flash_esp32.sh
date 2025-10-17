@@ -16,12 +16,12 @@ NC='\033[0m' # No Color
 
 # ASCII Art
 echo -e "${PURPLE}"
-echo "🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃"
-echo "🎃                                                              🎃"
-echo "🎃           HALLOWEEN ESP32 LED CONTROLLER                     🎃"
-echo "🎃                    Easy Flash Script                         🎃"
-echo "🎃                                                              🎃"
-echo "🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃"
+echo "👻👻👻👻👻👻👻👻👻👻👻👻👻👻👻👻👻👻👻👻👻👻👻👻👻👻👻👻👻👻"
+echo "👻                                                              👻"
+echo "👻              SPOOKYGPT ESP32 LED CONTROLLER                  👻"
+echo "👻                    Easy Flash Script                         👻"
+echo "👻                                                              👻"
+echo "👻👻👻👻👻👻👻👻👻👻👻👻👻👻👻👻👻👻👻👻👻👻👻👻👻👻👻👻👻👻"
 echo -e "${NC}"
 
 # Function to print colored output
@@ -144,8 +144,21 @@ flash_esp32() {
         sed -i.bak "s|upload_port = .*|upload_port = $DEVICE|" platformio.ini
     fi
     
-    if pio run --target upload; then
-        print_success "ESP32 flashed successfully! 🎃✨"
+    # COMPLETE WIPE AND REBUILD - Nuclear option!
+    print_status "🧹 COMPLETE DEVICE WIPE - Erasing all flash memory..."
+    pio run --target erase --environment esp32-c3-devkitm-1 --upload-port "$DEVICE"
+    
+    print_status "🧹 COMPLETE BUILD CLEANUP - Removing all build artifacts..."
+    pio run --target clean
+    
+    print_status "🗑️ Removing build directory completely..."
+    rm -rf .pio/build/
+    
+    print_status "🔨 COMPLETE REBUILD FROM SCRATCH..."
+    if pio run --target upload --environment esp32-c3-devkitm-1 --upload-port "$DEVICE"; then
+        print_success "ESP32 flashed successfully! 👻✨"
+        print_success "Device should now advertise as 'SpookyGPT-LEDs'"
+        print_status "Ready to connect with your iOS SpookyGPT app!"
         return 0
     else
         print_error "Failed to flash ESP32."
@@ -154,6 +167,7 @@ flash_esp32() {
         print_status "  - Try pressing the BOOT button while flashing"
         print_status "  - Check USB cable (use data cable, not just charging)"
         print_status "  - Try different USB port"
+        print_status "  - Unplug and replug ESP32, then try again"
         return 1
     fi
 }

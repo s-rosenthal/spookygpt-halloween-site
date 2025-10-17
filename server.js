@@ -15,6 +15,9 @@ const queryHistory = [];
 const recentQueries = []; // Store recent queries for admin view
 let servicesPaused = false; // Admin can pause all services
 
+// LED control state
+let lastLedCommand = null; // Track last LED command sent
+
 // Setup file paths
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -91,6 +94,14 @@ app.post("/api/chat", async (req, res) => {
     if (recentQueries.length > 20) {
       recentQueries.shift();
     }
+    
+    // Auto-send LED_ON command for every query
+    const newCommand = {
+      action: 'LED_ON:3000',
+      timestamp: Date.now(),
+      queryCount: totalQueries
+    };
+    lastLedCommand = newCommand;
     
     res.setHeader('X-Total-Queries', String(totalQueries));
 
@@ -238,7 +249,45 @@ app.post('/api/admin/unpause', requireAdmin, (req, res) => {
 });
 
 app.get('/api/admin/status', requireAdmin, (_req, res) => {
-  res.json({ paused: servicesPaused });
+  res.json({ 
+    paused: servicesPaused,
+    lastLedCommand: lastLedCommand
+  });
+});
+
+// LED Control Endpoints for Admin Panel
+app.post('/api/admin/led/on', requireAdmin, (req, res) => {
+  lastLedCommand = {
+    action: 'LED_ON:3000',
+    timestamp: Date.now(),
+    queryCount: totalQueries + 1 // Simulate a new query
+  };
+  
+  res.json({ 
+    success: true, 
+    message: 'LED ON command sent',
+    command: lastLedCommand
+  });
+});
+
+app.post('/api/admin/led/off', requireAdmin, (req, res) => {
+  lastLedCommand = {
+    action: 'LED_OFF',
+    timestamp: Date.now()
+  };
+  
+  res.json({ 
+    success: true, 
+    message: 'LED OFF command sent',
+    command: lastLedCommand
+  });
+});
+
+app.get('/api/admin/led/status', requireAdmin, (_req, res) => {
+  res.json({
+    lastLedCommand: lastLedCommand,
+    totalQueries: totalQueries
+  });
 });
 
 // API endpoints
@@ -282,9 +331,10 @@ app.get("/api/characters", (req, res) => {
 
 // LED status endpoint for ESP32
 app.get("/api/status", (_req, res) => {
-  res.json({ 
+  res.json({
     totalQueries,
-    ledsEnabled: !servicesPaused // LEDs enabled when services are not paused
+    ledsEnabled: !servicesPaused, // LEDs enabled when services are not paused
+    lastLedCommand: lastLedCommand // Last LED command from admin
   });
 });
 
