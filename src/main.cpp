@@ -19,6 +19,11 @@ BLECharacteristic* pCharacteristic = NULL;
 bool deviceConnected = false;
 bool oldDeviceConnected = false;
 
+// Party mode state
+bool partyModeActive = false;
+unsigned long lastPartyUpdate = 0;
+int partyHueOffset = 0;
+
 // Custom UUIDs for Halloween LED Controller
 #define SERVICE_UUID        "12345678-1234-1234-1234-123456789abc"
 #define CHARACTERISTIC_UUID "87654321-4321-4321-4321-cba987654321"
@@ -172,19 +177,14 @@ class MyCallbacks: public BLECharacteristicCallbacks {
           }
           
         } else if (command == "LED_PARTY") {
-          Serial.println("🎉 Setting PARTY MODE rainbow colors!");
-          
-          // Set each LED to a different rainbow color
-          for (int i = 0; i < NUM_LEDS; i++) {
-            int ledHue = (i * 256 / NUM_LEDS) % 256; // Spread rainbow across all LEDs
-            leds[i] = CHSV(ledHue, 255, 200); // High saturation, bright
-          }
-          FastLED.show();
-          
-          Serial.println("🎉 Rainbow party colors set!");
+          Serial.println("🎉 Starting PARTY MODE with moving rainbow wave!");
+          partyModeActive = true;
+          lastPartyUpdate = millis();
+          partyHueOffset = 0;
           
         } else if (command == "LED_OFF") {
           Serial.println("🔴 Turning OFF LED strip");
+          partyModeActive = false; // Stop party mode
           fill_solid(leds, NUM_LEDS, CRGB::Black);
           FastLED.show();
           
@@ -275,5 +275,25 @@ void loop() {
     oldDeviceConnected = deviceConnected;
   }
   
-  delay(100);
+  // Handle party mode animation (non-blocking)
+  if (partyModeActive) {
+    unsigned long currentTime = millis();
+    
+    // Update LED animation every 50ms for smooth wave motion
+    if (currentTime - lastPartyUpdate >= 50) {
+      // Create moving rainbow wave effect
+      for (int i = 0; i < NUM_LEDS; i++) {
+        // Calculate hue for each LED with wave pattern
+        int ledHue = (partyHueOffset + (i * 256 / NUM_LEDS)) % 256;
+        leds[i] = CHSV(ledHue, 255, 200); // High saturation, bright
+      }
+      FastLED.show();
+      lastPartyUpdate = currentTime;
+    }
+    
+    // Move the wave by changing hue offset
+    partyHueOffset = (partyHueOffset + 2) % 256;
+  }
+  
+  delay(50);
 }
