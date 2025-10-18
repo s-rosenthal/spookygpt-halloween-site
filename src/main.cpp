@@ -3,9 +3,15 @@
 #include <BLEServer.h>
 #include <BLEUtils.h>
 #include <BLE2902.h>
+#include <FastLED.h>
 
-// LED Configuration - Using simple digital pin control
-#define LED_PIN 8  // Built-in LED pin for ESP32-C3 (same as blink test)
+// WS2812E LED Strip Configuration
+#define LED_PIN 4        // Data pin for WS2812E strip
+#define NUM_LEDS 50      // Number of LEDs in your strip (adjust as needed)
+#define LED_TYPE WS2812B // LED strip type (compatible with WS2812E)
+#define COLOR_ORDER GRB   // Color order for WS2812E
+
+CRGB leds[NUM_LEDS];     // LED array
 
 // BLE Configuration
 BLEServer* pServer = NULL;
@@ -43,21 +49,24 @@ class MyCallbacks: public BLECharacteristicCallbacks {
           int duration = command.substring(7).toInt();
           if (duration == 0) duration = 3000; // Default 3 seconds
           
-          Serial.println("🎃 Turning ON LEDs for " + String(duration) + "ms");
+          Serial.println("🎃 Turning ON LED strip for " + String(duration) + "ms");
           
-          // Turn on LED (LOW = ON for ESP32-C3 built-in LED)
-          digitalWrite(LED_PIN, LOW);
+          // Turn on all LEDs with orange color (Halloween theme)
+          fill_solid(leds, NUM_LEDS, CRGB::Orange);
+          FastLED.show();
           
           delay(duration);
           
-          // Turn off LED
-          digitalWrite(LED_PIN, HIGH);
+          // Turn off all LEDs
+          fill_solid(leds, NUM_LEDS, CRGB::Black);
+          FastLED.show();
           
-          Serial.println("🔴 LEDs turned OFF");
+          Serial.println("🔴 LED strip turned OFF");
           
         } else if (command == "LED_OFF") {
-          Serial.println("🔴 Turning OFF LEDs");
-          digitalWrite(LED_PIN, HIGH);
+          Serial.println("🔴 Turning OFF LED strip");
+          fill_solid(leds, NUM_LEDS, CRGB::Black);
+          FastLED.show();
           
         } else if (command == "PING") {
           Serial.println("🏓 PING received - responding with PONG");
@@ -75,12 +84,16 @@ void setup() {
   }
   
   Serial.println();
-      Serial.println("🎃 ESP32-C3 SpookyGPT LED Controller");
-  Serial.println("====================================");
+  Serial.println("🎃 ESP32-C3 SpookyGPT WS2812E LED Controller");
+  Serial.println("===========================================");
   
-  // Initialize LED pin
-  pinMode(LED_PIN, OUTPUT);
-  digitalWrite(LED_PIN, HIGH); // Start with LED off (HIGH = OFF for ESP32-C3)
+  // Initialize FastLED
+  FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS);
+  FastLED.setBrightness(150); // Set brightness (0-255) - increased for better visibility
+  
+  // Clear all LEDs (turn off)
+  fill_solid(leds, NUM_LEDS, CRGB::Black);
+  FastLED.show();
   
   // Initialize BLE
   BLEDevice::init("SpookyGPT-LEDS");
@@ -117,11 +130,13 @@ void setup() {
       Serial.println("📱 Device name: SpookyGPT-LEDS");
   Serial.println("🔗 Ready to receive LED commands!");
   
-  // Blink LED to show it's ready
+  // Blink LED strip to show it's ready
   for (int i = 0; i < 3; i++) {
-    digitalWrite(LED_PIN, LOW);  // LED ON
+    fill_solid(leds, NUM_LEDS, CRGB::Orange); // LED strip ON
+    FastLED.show();
     delay(200);
-    digitalWrite(LED_PIN, HIGH); // LED OFF
+    fill_solid(leds, NUM_LEDS, CRGB::Black);  // LED strip OFF
+    FastLED.show();
     delay(200);
   }
 }
