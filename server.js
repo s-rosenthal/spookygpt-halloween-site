@@ -77,18 +77,13 @@ app.post("/api/chat", async (req, res) => {
     // Increment query counter
     totalQueries += 1;
     
-    // Store recent query for admin view (keep last 20)
+    // Store query for admin view (keep full history)
     recentQueries.push({
       timestamp: Date.now(),
       character: character,
       query: prompt,
       time: new Date().toLocaleTimeString()
     });
-    
-    // Keep only last 20 queries
-    if (recentQueries.length > 20) {
-      recentQueries.shift();
-    }
     
     // No LED commands generated automatically - phone app handles LED control
     
@@ -197,22 +192,20 @@ app.get('/api/admin/stats', requireAdmin, (_req, res) => {
   const uptime = Date.now() - serverStartedAt;
   const uptimeHours = Math.floor(uptime / (1000 * 60 * 60));
   const uptimeMinutes = Math.floor((uptime % (1000 * 60 * 60)) / (1000 * 60));
-  const uptimeSeconds = Math.floor((uptime % (1000 * 60)) / 1000);
   
   const queriesPerHour = uptimeHours > 0 ? Math.round(totalQueries / uptimeHours) : totalQueries;
   
-  const tenMinutesAgo = Date.now() - (10 * 60 * 1000);
-  const recentQueries = queryHistory.filter(q => q.timestamp > tenMinutesAgo).length;
+  const recentQueriesCount = recentQueries.length;
   
   const characterStats = {};
-  queryHistory.forEach(q => {
+  recentQueries.forEach(q => {
     characterStats[q.character] = (characterStats[q.character] || 0) + 1;
   });
   
   res.json({ 
     totalQueries, 
     serverStartedAt,
-    uptime: `${uptimeHours}h ${uptimeMinutes}m ${uptimeSeconds}s`,
+    uptime: `${uptimeHours}h ${uptimeMinutes}m`,
     queriesPerHour,
     recentQueries: recentQueriesCount,
     characterStats
@@ -222,7 +215,7 @@ app.get('/api/admin/stats', requireAdmin, (_req, res) => {
 // Admin query history endpoint
 app.get('/api/admin/queries', requireAdmin, (_req, res) => {
   res.json({ 
-    queries: recentQueries.slice(-10) // Last 10 queries
+    queries: recentQueries // All queries
   });
 });
 
@@ -255,14 +248,12 @@ app.get('/api/stats', (_req, res) => {
   const uptime = Date.now() - serverStartedAt;
   const uptimeHours = Math.floor(uptime / (1000 * 60 * 60));
   const uptimeMinutes = Math.floor((uptime % (1000 * 60 * 60)) / (1000 * 60));
-  const uptimeSeconds = Math.floor((uptime % (1000 * 60)) / 1000);
   
   // Calculate queries per hour
   const queriesPerHour = uptimeHours > 0 ? Math.round(totalQueries / uptimeHours) : totalQueries;
   
-  // Get recent activity (last 10 minutes)
-  const tenMinutesAgo = Date.now() - (10 * 60 * 1000);
-  const recentQueriesCount = recentQueries.filter(q => q.timestamp > tenMinutesAgo).length;
+  // Get all queries count
+  const recentQueriesCount = recentQueries.length;
   
   // Character usage stats
   const characterStats = {};
@@ -273,7 +264,7 @@ app.get('/api/stats', (_req, res) => {
   res.json({ 
     totalQueries, 
     serverStartedAt,
-    uptime: `${uptimeHours}h ${uptimeMinutes}m ${uptimeSeconds}s`,
+    uptime: `${uptimeHours}h ${uptimeMinutes}m`,
     queriesPerHour,
     recentQueries: recentQueriesCount,
     characterStats
