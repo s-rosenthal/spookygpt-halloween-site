@@ -29,6 +29,7 @@ extension Color {
     }
 }
 
+
 // MARK: - Data Models
 struct LEDStatus: Codable {
     let totalQueries: Int
@@ -355,6 +356,7 @@ struct ContentView: View {
     @State private var showingLogin = false
     @State private var adminPassword = ""
     @State private var selectedColor = Color.orange
+    @State private var isPartyModeActive = false
     
     var body: some View {
         NavigationView {
@@ -456,9 +458,31 @@ struct ContentView: View {
                                     
                                     Button("🔴 LED OFF") {
                                         bleManager.sendCommand("LED_OFF")
+                                        isPartyModeActive = false
                                     }
                                     .buttonStyle(SecondaryButtonStyle())
                                 }
+                                
+                                // Party Mode Button
+                                Button(action: {
+                                    if isPartyModeActive {
+                                        // Stop party mode
+                                        bleManager.sendCommand("LED_OFF")
+                                        isPartyModeActive = false
+                                    } else {
+                                        // Start party mode
+                                        bleManager.sendCommand("LED_PARTY")
+                                        isPartyModeActive = true
+                                    }
+                                }) {
+                                    HStack {
+                                        Text(isPartyModeActive ? "🎉 Stop Party" : "🎉 Party Mode")
+                                        if isPartyModeActive {
+                                            Text("🌈")
+                                        }
+                                    }
+                                }
+                                .buttonStyle(RainbowPartyButtonStyle(isActive: isPartyModeActive))
                             }
                         }
                     }
@@ -712,6 +736,45 @@ struct ActionButtonStyle: ButtonStyle {
     }
 }
 
+// MARK: - Rainbow Party Button Style
+struct RainbowPartyButtonStyle: ButtonStyle {
+    let isActive: Bool
+    @State private var animationOffset: CGFloat = 0
+    
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundColor(.white)
+            .fontWeight(.bold)
+            .font(.title2)
+            .padding(.horizontal, 30)
+            .padding(.vertical, 15)
+            .background(
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color.red, Color.orange, Color.yellow, 
+                        Color.green, Color.blue, Color.purple, Color.pink
+                    ]),
+                    startPoint: UnitPoint(x: animationOffset, y: 0),
+                    endPoint: UnitPoint(x: animationOffset + 1, y: 1)
+                )
+            )
+            .cornerRadius(20)
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(Color.white.opacity(0.3), lineWidth: 3)
+            )
+            .scaleEffect(configuration.isPressed ? 0.95 : (isActive ? 1.05 : 1.0))
+            .shadow(color: Color.purple.opacity(0.5), radius: isActive ? 10 : 5, x: 0, y: 2)
+            .animation(.easeInOut(duration: 0.3), value: configuration.isPressed)
+            .animation(.easeInOut(duration: 0.3), value: isActive)
+            .onAppear {
+                withAnimation(.linear(duration: 2.0).repeatForever(autoreverses: false)) {
+                    animationOffset = 1.0
+                }
+            }
+    }
+}
+
 // MARK: - Simple Color Picker
 struct SimpleColorPicker: View {
     @ObservedObject var bleManager: BLEManager
@@ -751,6 +814,7 @@ struct SimpleColorPicker: View {
         }
     }
 }
+
 
 // MARK: - Preview
 struct ContentView_Previews: PreviewProvider {

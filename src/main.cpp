@@ -171,6 +171,18 @@ class MyCallbacks: public BLECharacteristicCallbacks {
             Serial.println("❌ Invalid animation color format. Use: LED_ANIMATE:red,green,blue");
           }
           
+        } else if (command == "LED_PARTY") {
+          Serial.println("🎉 Setting PARTY MODE rainbow colors!");
+          
+          // Set each LED to a different rainbow color
+          for (int i = 0; i < NUM_LEDS; i++) {
+            int ledHue = (i * 256 / NUM_LEDS) % 256; // Spread rainbow across all LEDs
+            leds[i] = CHSV(ledHue, 255, 200); // High saturation, bright
+          }
+          FastLED.show();
+          
+          Serial.println("🎉 Rainbow party colors set!");
+          
         } else if (command == "LED_OFF") {
           Serial.println("🔴 Turning OFF LED strip");
           fill_solid(leds, NUM_LEDS, CRGB::Black);
