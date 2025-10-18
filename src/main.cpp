@@ -44,24 +44,66 @@ class MyCallbacks: public BLECharacteristicCallbacks {
         
         String command = String(rxValue.c_str());
         
-        if (command.startsWith("LED_ON:")) {
-          // Extract duration (e.g., "LED_ON:5000" = 5 seconds)
-          int duration = command.substring(7).toInt();
-          if (duration == 0) duration = 3000; // Default 3 seconds
+        if (command.startsWith("LED_COLOR:")) {
+          // Extract RGB values and optional duration (e.g., "LED_COLOR:255,128,64:5000" = RGB color for 5 seconds)
+          String colorData = command.substring(10);
+          Serial.println("🔍 Parsing color data: '" + colorData + "'");
           
-          Serial.println("🎃 Turning ON LED strip for " + String(duration) + "ms");
+          // Check if there's a duration (look for last colon)
+          int durationSep = colorData.lastIndexOf(':');
+          int duration = 0; // 0 means permanent (no duration)
           
-          // Turn on all LEDs with orange color (Halloween theme)
-          fill_solid(leds, NUM_LEDS, CRGB::Orange);
-          FastLED.show();
+          if (durationSep > 0) {
+            // Has duration - extract it
+            duration = colorData.substring(durationSep + 1).toInt();
+            colorData = colorData.substring(0, durationSep); // Remove duration part
+            Serial.println("🔍 Duration: " + String(duration) + "ms");
+          }
           
-          delay(duration);
+          int firstComma = colorData.indexOf(',');
+          int secondComma = colorData.indexOf(',', firstComma + 1);
           
-          // Turn off all LEDs
-          fill_solid(leds, NUM_LEDS, CRGB::Black);
-          FastLED.show();
+          Serial.println("🔍 First comma at: " + String(firstComma) + ", Second comma at: " + String(secondComma));
           
-          Serial.println("🔴 LED strip turned OFF");
+          if (firstComma >= 0 && secondComma > firstComma) {
+            int red = colorData.substring(0, firstComma).toInt();
+            int green = colorData.substring(firstComma + 1, secondComma).toInt();
+            int blue = colorData.substring(secondComma + 1).toInt();
+            
+            // Clamp values to 0-255 range
+            red = constrain(red, 0, 255);
+            green = constrain(green, 0, 255);
+            blue = constrain(blue, 0, 255);
+            
+            if (duration > 0) {
+              Serial.println("⚡ Setting LED color RGB(" + String(red) + "," + String(green) + "," + String(blue) + ") for " + String(duration) + "ms");
+              
+              // Flash the specified color for duration
+              fill_solid(leds, NUM_LEDS, CRGB(red, green, blue));
+              FastLED.show();
+              
+              delay(duration);
+              
+              // Turn off all LEDs
+              fill_solid(leds, NUM_LEDS, CRGB::Black);
+              FastLED.show();
+              
+              Serial.println("🔴 Flash completed");
+            } else {
+              Serial.println("🎨 Setting LED color to RGB(" + String(red) + "," + String(green) + "," + String(blue) + ") permanently");
+              
+              // Set all LEDs to the specified color permanently
+              fill_solid(leds, NUM_LEDS, CRGB(red, green, blue));
+              FastLED.show();
+              
+              // Send confirmation back
+              String confirmMsg = "COLOR_SET:" + String(red) + "," + String(green) + "," + String(blue);
+              pCharacteristic->setValue(confirmMsg.c_str());
+              pCharacteristic->notify();
+            }
+          } else {
+            Serial.println("❌ Invalid color format. Use: LED_COLOR:red,green,blue or LED_COLOR:red,green,blue:duration");
+          }
           
         } else if (command == "LED_OFF") {
           Serial.println("🔴 Turning OFF LED strip");

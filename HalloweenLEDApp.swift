@@ -380,47 +380,42 @@ struct ContentView: View {
     @State private var showingSettings = false
     @State private var showingLogin = false
     @State private var adminPassword = ""
+    @State private var selectedColor = Color.orange
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 20) {
-                // Header
-                VStack(spacing: 8) {
-                    Text("👻")
-                        .font(.system(size: 60))
-                    Text("SpookyGPT")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .foregroundColor(.primary)
-                    Text("ESP32 LED Controller")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.top)
-                
-                // Status Cards
-                VStack(spacing: 15) {
-                    // BLE Status
-                    StatusCard(
-                        title: "📱 ESP32 Connection",
-                        status: bleManager.isConnected ? "Connected" : "Disconnected",
-                        color: bleManager.isConnected ? .green : .red
-                    )
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Header
+                    VStack(spacing: 8) {
+                        Text("👻")
+                            .font(.system(size: 60))
+                        Text("SpookyGPT")
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                            .foregroundColor(.primary)
+                        Text("ESP32 LED Controller")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.top)
                     
-                    // API Status
-                    StatusCard(
-                        title: "🌐 Website Status",
-                        status: apiManager.isPolling ? "Polling" : "Stopped",
-                        color: apiManager.isPolling ? .green : .orange
-                    )
-                    
-                    // Background Status
-                    StatusCard(
-                        title: "🔄 Background Mode",
-                        status: appState.isInBackground ? "Running in Background" : "Foreground",
-                        color: appState.isInBackground ? .blue : .gray
-                    )
-                }
+                    // Status Cards
+                    VStack(spacing: 15) {
+                        // BLE Status
+                        StatusCard(
+                            title: "📱 ESP32 Connection",
+                            status: bleManager.isConnected ? "Connected" : "Disconnected",
+                            color: bleManager.isConnected ? .green : .red
+                        )
+                        
+                        // API Status
+                        StatusCard(
+                            title: "🌐 Website Status",
+                            status: apiManager.isPolling ? "Polling" : "Stopped",
+                            color: apiManager.isPolling ? .green : .orange
+                        )
+                    }
                 
                 // LED Status
                 if let status = apiManager.ledStatus {
@@ -474,10 +469,25 @@ struct ContentView: View {
                             .buttonStyle(SecondaryButtonStyle())
                             
                             // Manual LED Control
-                            Button("👻 LED ON") {
-                                bleManager.sendCommand("LED_ON:3000")
+                            VStack(spacing: 10) {
+                                // Simple Color Picker
+                                SimpleColorPicker(bleManager: bleManager, selectedColor: $selectedColor)
+                                
+                                HStack(spacing: 10) {
+                                    Button("👻 LED ON") {
+                                        // Send selected color for 3 seconds using new format
+                                        let rgb = getRGBValues(from: selectedColor)
+                                        bleManager.sendCommand("LED_COLOR:\(rgb.red),\(rgb.green),\(rgb.blue):3000")
+                                    }
+                                    .buttonStyle(ActionButtonStyle(color: selectedColor))
+                                    .animation(.easeInOut(duration: 0.3), value: selectedColor)
+                                    
+                                    Button("🔴 LED OFF") {
+                                        bleManager.sendCommand("LED_OFF")
+                                    }
+                                    .buttonStyle(SecondaryButtonStyle())
+                                }
                             }
-                            .buttonStyle(ActionButtonStyle(color: Color(red: 0.2, green: 0.8, blue: 0.2))) // Spooky green
                         }
                     }
                 }
@@ -489,9 +499,9 @@ struct ContentView: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
                 
-                Spacer()
+                }
+                .padding()
             }
-            .padding()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -516,6 +526,22 @@ struct ContentView: View {
                 bleManager.startScanning()
             }
         }
+    }
+    
+    private func getRGBValues(from color: Color) -> (red: Int, green: Int, blue: Int) {
+        let uiColor = UIColor(color)
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+        
+        uiColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        
+        return (
+            red: Int(red * 255),
+            green: Int(green * 255),
+            blue: Int(blue * 255)
+        )
     }
 }
 
@@ -708,10 +734,78 @@ struct ActionButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .foregroundColor(.white)
+            .fontWeight(.semibold)
             .padding()
-            .background(LinearGradient(gradient: Gradient(colors: [color, color.opacity(0.8)]), startPoint: .top, endPoint: .bottom))
+            .background(
+                LinearGradient(
+                    gradient: Gradient(colors: [color, color.opacity(0.7)]), 
+                    startPoint: .top, 
+                    endPoint: .bottom
+                )
+            )
             .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(color.opacity(0.3), lineWidth: 2)
+            )
             .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .shadow(color: color.opacity(0.3), radius: 4, x: 0, y: 2)
+    }
+}
+
+// MARK: - Simple Color Picker
+struct SimpleColorPicker: View {
+    @ObservedObject var bleManager: BLEManager
+    @Binding var selectedColor: Color
+    
+    var body: some View {
+        HStack {
+            Text("🎨 LED Color:")
+                .font(.subheadline)
+            
+            Spacer()
+            
+            // Color Preview Circle
+            Circle()
+                .fill(selectedColor)
+                .frame(width: 30, height: 30)
+                .overlay(
+                    Circle()
+                        .stroke(Color.gray, lineWidth: 1)
+                )
+            
+            // Color Picker
+            ColorPicker("", selection: $selectedColor)
+                .onChange(of: selectedColor) { newColor in
+                    // Automatically send RGB command when color changes (permanent color)
+                    let rgb = getRGBValues(from: newColor)
+                    bleManager.sendCommand("LED_COLOR:\(rgb.red),\(rgb.green),\(rgb.blue)")
+                }
+                .labelsHidden()
+        }
+        .padding()
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
+        .onDisappear {
+            // Send LED_OFF when exiting color picker
+            bleManager.sendCommand("LED_OFF")
+        }
+    }
+    
+    private func getRGBValues(from color: Color) -> (red: Int, green: Int, blue: Int) {
+        let uiColor = UIColor(color)
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+        
+        uiColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        
+        return (
+            red: Int(red * 255),
+            green: Int(green * 255),
+            blue: Int(blue * 255)
+        )
     }
 }
 
