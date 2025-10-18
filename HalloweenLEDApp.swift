@@ -9,12 +9,28 @@
 import SwiftUI
 import CoreBluetooth
 import Foundation
-import BackgroundTasks
-import UserNotifications
+
+// MARK: - Color Utilities
+extension Color {
+    func toRGB() -> (red: Int, green: Int, blue: Int) {
+        let uiColor = UIColor(self)
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+        
+        uiColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        
+        return (
+            red: Int(red * 255),
+            green: Int(green * 255),
+            blue: Int(blue * 255)
+        )
+    }
+}
 
 // MARK: - Data Models
 struct LEDStatus: Codable {
-    let lastLedCommand: LEDCommand?
     let totalQueries: Int
 }
 
@@ -172,12 +188,9 @@ class APIManager: ObservableObject {
     private var pollingTimer: Timer?
     private let baseURL: String
     private var authToken: String?
-    private var lastProcessedCommandTimestamp: Int64 = 0
+    private var lastProcessedQueryCount: Int = 0
     weak var bleManager: BLEManager?
-    
-    // Background task management
-    private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
-    private var backgroundTimer: Timer?
+    var selectedColor: Color = .orange
     
     init(baseURL: String) {
         self.baseURL = baseURL
@@ -246,44 +259,17 @@ class APIManager: ObservableObject {
         // Initial fetch
         fetchLEDStatus()
         
-        // Set up timer with background execution support
-        setupBackgroundPolling(interval: interval)
-    }
-    
-    private func setupBackgroundPolling(interval: TimeInterval) {
-        // Create timer that works in background
+        // Set up timer
         pollingTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in
             self.fetchLEDStatus()
         }
-        
-        // Ensure timer continues in background
-        RunLoop.current.add(pollingTimer!, forMode: .common)
-        
-        // Register for background task
-        registerBackgroundTask()
     }
     
-    private func registerBackgroundTask() {
-        backgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "LEDPolling") {
-            // This block is called when the background task is about to expire
-            self.endBackgroundTask()
-        }
-    }
-    
-    private func endBackgroundTask() {
-        if backgroundTaskID != .invalid {
-            UIApplication.shared.endBackgroundTask(backgroundTaskID)
-            backgroundTaskID = .invalid
-        }
-    }
     
     func stopPolling() {
         pollingTimer?.invalidate()
         pollingTimer = nil
-        backgroundTimer?.invalidate()
-        backgroundTimer = nil
         isPolling = false
-        endBackgroundTask()
     }
     
     private func fetchLEDStatus() {
@@ -318,15 +304,13 @@ class APIManager: ObservableObject {
                     self.ledStatus = status
                     self.lastError = nil
                     
-                    if let command = status.lastLedCommand {
-                        // Check for new LED commands to send to ESP32
-                        if command.timestamp > self.lastProcessedCommandTimestamp {
-                            self.lastProcessedCommandTimestamp = command.timestamp
-                            
-                            // Send command to ESP32 if connected
-                            if let bleManager = self.bleManager, bleManager.isConnected {
-                                bleManager.sendCommand(command.action)
-                            }
+                    // Check if query count increased (new query received)
+                    if status.totalQueries > self.lastProcessedQueryCount {
+                        self.lastProcessedQueryCount = status.totalQueries
+                        
+                        // Send LED command to ESP32 if connected
+                        if let bleManager = self.bleManager, bleManager.isConnected {
+                            self.sendQueryLEDCommand(bleManager: bleManager)
                         }
                     }
                 } catch {
@@ -335,39 +319,21 @@ class APIManager: ObservableObject {
             }
         }.resume()
     }
+    
+    private func sendQueryLEDCommand(bleManager: BLEManager) {
+        // Send selected color flash for 3 seconds
+        let rgb = selectedColor.toRGB()
+        bleManager.sendCommand("LED_COLOR:\(rgb.red),\(rgb.green),\(rgb.blue):3000")
+    }
 }
 
 // MARK: - Main App
 @main
 struct HalloweenLEDApp: App {
-    @StateObject private var appState = AppState()
-    
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environmentObject(appState)
-                .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
-                    appState.handleBackgroundTransition()
-                }
-                .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
-                    appState.handleForegroundTransition()
-                }
         }
-    }
-}
-
-// MARK: - App State Manager
-class AppState: ObservableObject {
-    @Published var isInBackground = false
-    
-    func handleBackgroundTransition() {
-        isInBackground = true
-        print("App entered background - continuing LED polling")
-    }
-    
-    func handleForegroundTransition() {
-        isInBackground = false
-        print("App entered foreground")
     }
 }
 
@@ -375,7 +341,6 @@ class AppState: ObservableObject {
 struct ContentView: View {
     @StateObject private var bleManager = BLEManager()
     @StateObject private var apiManager = APIManager(baseURL: "https://treasa-apterygial-magdalen.ngrok-free.dev")
-    @EnvironmentObject var appState: AppState
     @State private var websiteURL = "https://treasa-apterygial-magdalen.ngrok-free.dev"
     @State private var showingSettings = false
     @State private var showingLogin = false
@@ -475,9 +440,7 @@ struct ContentView: View {
                                 
                                 HStack(spacing: 10) {
                                     Button("👻 LED ON") {
-                                        // Send selected color for 3 seconds using new format
-                                        let rgb = getRGBValues(from: selectedColor)
-                                        bleManager.sendCommand("LED_COLOR:\(rgb.red),\(rgb.green),\(rgb.blue):3000")
+                                        sendLEDOnCommand(bleManager: bleManager, color: selectedColor)
                                     }
                                     .buttonStyle(ActionButtonStyle(color: selectedColor))
                                     .animation(.easeInOut(duration: 0.3), value: selectedColor)
@@ -526,22 +489,16 @@ struct ContentView: View {
                 bleManager.startScanning()
             }
         }
+        .onChange(of: selectedColor) { newColor in
+            // Update API manager with the selected color
+            apiManager.selectedColor = newColor
+        }
     }
     
-    private func getRGBValues(from color: Color) -> (red: Int, green: Int, blue: Int) {
-        let uiColor = UIColor(color)
-        var red: CGFloat = 0
-        var green: CGFloat = 0
-        var blue: CGFloat = 0
-        var alpha: CGFloat = 0
-        
-        uiColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
-        
-        return (
-            red: Int(red * 255),
-            green: Int(green * 255),
-            blue: Int(blue * 255)
-        )
+    private func sendLEDOnCommand(bleManager: BLEManager, color: Color) {
+        // Send selected color flash for 3 seconds
+        let rgb = color.toRGB()
+        bleManager.sendCommand("LED_COLOR:\(rgb.red),\(rgb.green),\(rgb.blue):3000")
     }
 }
 
@@ -577,18 +534,11 @@ struct LEDStatusView: View {
                 .font(.headline)
             
             HStack {
-                Text("Queries:")
+                Text("Total Queries:")
                 Spacer()
                 Text("\(status.totalQueries)")
-            }
-            
-            if let command = status.lastLedCommand {
-                HStack {
-                    Text("Last Command:")
-                    Spacer()
-                    Text(command.action)
-                        .foregroundColor(.blue)
-                }
+                    .fontWeight(.semibold)
+                    .foregroundColor(.blue)
             }
         }
         .padding()
@@ -778,7 +728,7 @@ struct SimpleColorPicker: View {
             ColorPicker("", selection: $selectedColor)
                 .onChange(of: selectedColor) { newColor in
                     // Automatically send RGB command when color changes (permanent color)
-                    let rgb = getRGBValues(from: newColor)
+                    let rgb = newColor.toRGB()
                     bleManager.sendCommand("LED_COLOR:\(rgb.red),\(rgb.green),\(rgb.blue)")
                 }
                 .labelsHidden()
@@ -790,22 +740,6 @@ struct SimpleColorPicker: View {
             // Send LED_OFF when exiting color picker
             bleManager.sendCommand("LED_OFF")
         }
-    }
-    
-    private func getRGBValues(from color: Color) -> (red: Int, green: Int, blue: Int) {
-        let uiColor = UIColor(color)
-        var red: CGFloat = 0
-        var green: CGFloat = 0
-        var blue: CGFloat = 0
-        var alpha: CGFloat = 0
-        
-        uiColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
-        
-        return (
-            red: Int(red * 255),
-            green: Int(green * 255),
-            blue: Int(blue * 255)
-        )
     }
 }
 

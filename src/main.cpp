@@ -63,8 +63,6 @@ class MyCallbacks: public BLECharacteristicCallbacks {
           int firstComma = colorData.indexOf(',');
           int secondComma = colorData.indexOf(',', firstComma + 1);
           
-          Serial.println("🔍 First comma at: " + String(firstComma) + ", Second comma at: " + String(secondComma));
-          
           if (firstComma >= 0 && secondComma > firstComma) {
             int red = colorData.substring(0, firstComma).toInt();
             int green = colorData.substring(firstComma + 1, secondComma).toInt();

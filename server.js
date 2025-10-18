@@ -11,12 +11,8 @@ const PORT = process.env.PORT || 3000;
 // Global query counter and performance metrics
 let totalQueries = 0;
 const serverStartedAt = Date.now();
-const queryHistory = [];
 const recentQueries = []; // Store recent queries for admin view
 let servicesPaused = false; // Admin can pause all services
-
-// LED control state
-let lastLedCommand = null; // Track last LED command sent
 
 // Setup file paths
 const __filename = fileURLToPath(import.meta.url);
@@ -80,7 +76,6 @@ app.post("/api/chat", async (req, res) => {
 
     // Increment query counter
     totalQueries += 1;
-    queryHistory.push({ timestamp: Date.now(), character: character });
     
     // Store recent query for admin view (keep last 20)
     recentQueries.push({
@@ -95,13 +90,7 @@ app.post("/api/chat", async (req, res) => {
       recentQueries.shift();
     }
     
-    // Auto-send LED_ON command for every query
-    const newCommand = {
-      action: 'LED_ON:3000',
-      timestamp: Date.now(),
-      queryCount: totalQueries
-    };
-    lastLedCommand = newCommand;
+    // No LED commands generated automatically - phone app handles LED control
     
     res.setHeader('X-Total-Queries', String(totalQueries));
 
@@ -225,7 +214,7 @@ app.get('/api/admin/stats', requireAdmin, (_req, res) => {
     serverStartedAt,
     uptime: `${uptimeHours}h ${uptimeMinutes}m ${uptimeSeconds}s`,
     queriesPerHour,
-    recentQueries,
+    recentQueries: recentQueriesCount,
     characterStats
   });
 });
@@ -250,42 +239,13 @@ app.post('/api/admin/unpause', requireAdmin, (req, res) => {
 
 app.get('/api/admin/status', requireAdmin, (_req, res) => {
   res.json({ 
-    paused: servicesPaused,
-    lastLedCommand: lastLedCommand
+    paused: servicesPaused
   });
 });
 
-// LED Control Endpoints for Admin Panel
-app.post('/api/admin/led/on', requireAdmin, (req, res) => {
-  lastLedCommand = {
-    action: 'LED_ON:3000',
-    timestamp: Date.now(),
-    queryCount: totalQueries + 1 // Simulate a new query
-  };
-  
-  res.json({ 
-    success: true, 
-    message: 'LED ON command sent',
-    command: lastLedCommand
-  });
-});
-
-app.post('/api/admin/led/off', requireAdmin, (req, res) => {
-  lastLedCommand = {
-    action: 'LED_OFF',
-    timestamp: Date.now()
-  };
-  
-  res.json({ 
-    success: true, 
-    message: 'LED OFF command sent',
-    command: lastLedCommand
-  });
-});
-
+// LED Status Endpoint for Admin Panel (phone app polling)
 app.get('/api/admin/led/status', requireAdmin, (_req, res) => {
   res.json({
-    lastLedCommand: lastLedCommand,
     totalQueries: totalQueries
   });
 });
@@ -302,11 +262,11 @@ app.get('/api/stats', (_req, res) => {
   
   // Get recent activity (last 10 minutes)
   const tenMinutesAgo = Date.now() - (10 * 60 * 1000);
-  const recentQueries = queryHistory.filter(q => q.timestamp > tenMinutesAgo).length;
+  const recentQueriesCount = recentQueries.filter(q => q.timestamp > tenMinutesAgo).length;
   
   // Character usage stats
   const characterStats = {};
-  queryHistory.forEach(q => {
+  recentQueries.forEach(q => {
     characterStats[q.character] = (characterStats[q.character] || 0) + 1;
   });
   
@@ -315,7 +275,7 @@ app.get('/api/stats', (_req, res) => {
     serverStartedAt,
     uptime: `${uptimeHours}h ${uptimeMinutes}m ${uptimeSeconds}s`,
     queriesPerHour,
-    recentQueries,
+    recentQueries: recentQueriesCount,
     characterStats
   });
 });
@@ -329,14 +289,6 @@ app.get("/api/characters", (req, res) => {
   res.json({ characters });
 });
 
-// LED status endpoint for ESP32
-app.get("/api/status", (_req, res) => {
-  res.json({
-    totalQueries,
-    ledsEnabled: !servicesPaused, // LEDs enabled when services are not paused
-    lastLedCommand: lastLedCommand // Last LED command from admin
-  });
-});
 
 // Fallback route
 app.get("*", (_, res) => {
