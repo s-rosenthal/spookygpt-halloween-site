@@ -7,7 +7,7 @@
 
 // WS2812E LED Strip Configuration
 #define LED_PIN 4        // Data pin for WS2812E strip
-#define NUM_LEDS 50      // Number of LEDs in your strip (adjust as needed)
+#define NUM_LEDS 60      // Number of LEDs in your strip (adjust as needed)
 #define LED_TYPE WS2812B // LED strip type (compatible with WS2812E)
 #define COLOR_ORDER GRB   // Color order for WS2812E
 
@@ -101,6 +101,74 @@ class MyCallbacks: public BLECharacteristicCallbacks {
             }
           } else {
             Serial.println("❌ Invalid color format. Use: LED_COLOR:red,green,blue or LED_COLOR:red,green,blue:duration");
+          }
+          
+        } else if (command.startsWith("LED_ANIMATE:")) {
+          // Extract RGB values for animation (e.g., "LED_ANIMATE:255,128,64")
+          String colorData = command.substring(12);
+          Serial.println("🎬 Parsing animation color data: '" + colorData + "'");
+          
+          int firstComma = colorData.indexOf(',');
+          int secondComma = colorData.indexOf(',', firstComma + 1);
+          
+          if (firstComma >= 0 && secondComma > firstComma) {
+            int red = colorData.substring(0, firstComma).toInt();
+            int green = colorData.substring(firstComma + 1, secondComma).toInt();
+            int blue = colorData.substring(secondComma + 1).toInt();
+            
+            // Clamp values to 0-255 range
+            red = constrain(red, 0, 255);
+            green = constrain(green, 0, 255);
+            blue = constrain(blue, 0, 255);
+            
+            Serial.println("🎬 Starting LED animation with RGB(" + String(red) + "," + String(green) + "," + String(blue) + ")");
+            
+            // Clear all LEDs first
+            fill_solid(leds, NUM_LEDS, CRGB::Black);
+            FastLED.show();
+            delay(100);
+            
+            // Circular chasing animation - 3 cycles with group of 3 LEDs
+            for (int cycle = 0; cycle < 3; cycle++) {
+              Serial.println("🔄 Animation cycle " + String(cycle + 1) + "/3");
+              
+              // Create chasing effect: group of 3 LEDs travels around the circle
+              for (int startPos = 0; startPos < NUM_LEDS; startPos++) {
+                // Turn off all LEDs
+                fill_solid(leds, NUM_LEDS, CRGB::Black);
+                
+                // Turn on group of 3 LEDs starting at current position
+                for (int i = 0; i < 3; i++) {
+                  int ledIndex = (startPos + i) % NUM_LEDS;
+                  leds[ledIndex] = CRGB(red, green, blue);
+                }
+                
+                FastLED.show();
+                delay(30); // Speed of the chasing animation
+              }
+            }
+            
+            // Final two blinks with selected color
+            Serial.println("✨ Final blinks");
+            for (int blink = 0; blink < 2; blink++) {
+              fill_solid(leds, NUM_LEDS, CRGB(red, green, blue));
+              FastLED.show();
+              delay(200);
+              
+              fill_solid(leds, NUM_LEDS, CRGB::Black);
+              FastLED.show();
+              delay(200);
+            }
+            
+            Serial.println("🎬 Animation completed");
+            
+            // Send confirmation back
+            String confirmMsg = "ANIMATION_COMPLETE:" + String(red) + "," + String(green) + "," + String(blue);
+            pCharacteristic->setValue(confirmMsg.c_str());
+            pCharacteristic->notify();
+            
+          } else {
+            Serial.println("❌ Invalid animation color format. Use: LED_ANIMATE:red,green,blue");
           }
           
         } else if (command == "LED_OFF") {

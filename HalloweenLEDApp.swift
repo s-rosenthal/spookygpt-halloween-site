@@ -189,6 +189,7 @@ class APIManager: ObservableObject {
     private let baseURL: String
     private var authToken: String?
     private var lastProcessedQueryCount: Int = 0
+    private var isFirstFetch: Bool = true
     weak var bleManager: BLEManager?
     var selectedColor: Color = .orange
     
@@ -270,6 +271,8 @@ class APIManager: ObservableObject {
         pollingTimer?.invalidate()
         pollingTimer = nil
         isPolling = false
+        // Reset first fetch flag so next start will establish new baseline
+        isFirstFetch = true
     }
     
     private func fetchLEDStatus() {
@@ -304,13 +307,19 @@ class APIManager: ObservableObject {
                     self.ledStatus = status
                     self.lastError = nil
                     
-                    // Check if query count increased (new query received)
-                    if status.totalQueries > self.lastProcessedQueryCount {
+                    // Handle first fetch - just set baseline, don't trigger animation
+                    if self.isFirstFetch {
                         self.lastProcessedQueryCount = status.totalQueries
-                        
-                        // Send LED command to ESP32 if connected
-                        if let bleManager = self.bleManager, bleManager.isConnected {
-                            self.sendQueryLEDCommand(bleManager: bleManager)
+                        self.isFirstFetch = false
+                    } else {
+                        // Check if query count increased (new query received)
+                        if status.totalQueries > self.lastProcessedQueryCount {
+                            self.lastProcessedQueryCount = status.totalQueries
+                            
+                            // Send LED command to ESP32 if connected
+                            if let bleManager = self.bleManager, bleManager.isConnected {
+                                self.sendQueryLEDCommand(bleManager: bleManager)
+                            }
                         }
                     }
                 } catch {
@@ -321,9 +330,9 @@ class APIManager: ObservableObject {
     }
     
     private func sendQueryLEDCommand(bleManager: BLEManager) {
-        // Send selected color permanently (no timer)
+        // Send LED animation command with selected color
         let rgb = selectedColor.toRGB()
-        bleManager.sendCommand("LED_COLOR:\(rgb.red),\(rgb.green),\(rgb.blue)")
+        bleManager.sendCommand("LED_ANIMATE:\(rgb.red),\(rgb.green),\(rgb.blue)")
     }
 }
 
