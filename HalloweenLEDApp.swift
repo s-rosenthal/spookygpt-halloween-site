@@ -321,9 +321,9 @@ class APIManager: ObservableObject {
     }
     
     private func sendQueryLEDCommand(bleManager: BLEManager) {
-        // Send selected color flash for 3 seconds
+        // Send selected color permanently (no timer)
         let rgb = selectedColor.toRGB()
-        bleManager.sendCommand("LED_COLOR:\(rgb.red),\(rgb.green),\(rgb.blue):3000")
+        bleManager.sendCommand("LED_COLOR:\(rgb.red),\(rgb.green),\(rgb.blue)")
     }
 }
 
@@ -496,9 +496,9 @@ struct ContentView: View {
     }
     
     private func sendLEDOnCommand(bleManager: BLEManager, color: Color) {
-        // Send selected color flash for 3 seconds
+        // Send selected color permanently (no timer)
         let rgb = color.toRGB()
-        bleManager.sendCommand("LED_COLOR:\(rgb.red),\(rgb.green),\(rgb.blue):3000")
+        bleManager.sendCommand("LED_COLOR:\(rgb.red),\(rgb.green),\(rgb.blue)")
     }
 }
 
