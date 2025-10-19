@@ -286,63 +286,63 @@ app.get("/api/speech-config", (req, res) => {
     speechEnabled: true,
     characterVoices: {
       default: { 
-        rate: 0.95, 
+        rate: 1.0, 
         pitch: 1.0, 
         volume: 0.9,
         voice: "Google UK English Female",
         effects: {
-          reverb: 0.05,
+          reverb: 0.0,
           echo: 0.0,
           distortion: 0.0,
           lowpass: 1.0
         }
       },
       vampire: { 
-        rate: 0.8, 
-        pitch: 0.85, 
+        rate: 0.9, 
+        pitch: 0.9, 
         volume: 0.9,
         voice: "Google UK English Male",
         effects: {
-          reverb: 0.1,
-          echo: 0.05,
+          reverb: 0.0,
+          echo: 0.0,
           distortion: 0.0,
-          lowpass: 0.95
+          lowpass: 1.0
         }
       },
       witch: { 
-        rate: 1.05, 
-        pitch: 1.15, 
+        rate: 1.0, 
+        pitch: 1.1, 
         volume: 0.9,
         voice: "Google UK English Female",
         effects: {
-          reverb: 0.08,
-          echo: 0.03,
+          reverb: 0.0,
+          echo: 0.0,
           distortion: 0.0,
           lowpass: 1.0
         }
       },
       werewolf: { 
-        rate: 0.9, 
+        rate: 0.95, 
         pitch: 0.95, 
         volume: 0.9,
         voice: "Google UK English Male",
         effects: {
-          reverb: 0.06,
-          echo: 0.02,
-          distortion: 0.05,
-          lowpass: 0.98
+          reverb: 0.0,
+          echo: 0.0,
+          distortion: 0.0,
+          lowpass: 1.0
         }
       },
       zombie: { 
-        rate: 0.7, 
-        pitch: 0.8, 
-        volume: 0.85,
+        rate: 0.8, 
+        pitch: 0.9, 
+        volume: 0.9,
         voice: "Google UK English Male",
         effects: {
-          reverb: 0.15,
-          echo: 0.08,
-          distortion: 0.1,
-          lowpass: 0.85
+          reverb: 0.0,
+          echo: 0.0,
+          distortion: 0.0,
+          lowpass: 1.0
         }
       }
     }

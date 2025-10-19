@@ -597,10 +597,15 @@ function initializeAudioContext() {
 }
 
 function createVoiceEffects(characterId) {
-  if (!initializeAudioContext()) return null;
-  
   const characterVoice = speechConfig.characterVoices?.[characterId] || speechConfig.characterVoices?.default;
   const effects = characterVoice?.effects || {};
+  
+  // If no effects are needed, return null to bypass audio processing
+  if (effects.reverb === 0 && effects.echo === 0 && effects.distortion === 0 && effects.lowpass >= 1.0) {
+    return null;
+  }
+  
+  if (!initializeAudioContext()) return null;
   
   // Create audio nodes with cleaner routing
   const source = audioContext.createGain();
@@ -830,18 +835,18 @@ function speakText(text, characterId) {
 }
 
 function getBestFallbackVoice(characterId, voices) {
-  // Prioritize clearer, more natural voices
+  // Prioritize the most natural, human-like voices
   const voicePreferences = {
-    vampire: ['google', 'male', 'british', 'english', 'us'],
-    witch: ['google', 'female', 'british', 'english', 'us'],
-    werewolf: ['google', 'male', 'british', 'english', 'us'],
-    zombie: ['google', 'male', 'british', 'english', 'us'],
-    default: ['google', 'female', 'british', 'english', 'us']
+    vampire: ['google', 'male', 'british', 'english', 'us', 'natural'],
+    witch: ['google', 'female', 'british', 'english', 'us', 'natural'],
+    werewolf: ['google', 'male', 'british', 'english', 'us', 'natural'],
+    zombie: ['google', 'male', 'british', 'english', 'us', 'natural'],
+    default: ['google', 'female', 'british', 'english', 'us', 'natural']
   };
   
   const preferences = voicePreferences[characterId] || voicePreferences.default;
   
-  // First try to find Google voices (usually clearest)
+  // First try to find Google voices (usually most natural)
   for (const preference of preferences) {
     const voice = voices.find(v => 
       v.name.toLowerCase().includes(preference) && 
@@ -859,11 +864,15 @@ function getBestFallbackVoice(characterId, voices) {
     if (voice) return voice;
   }
   
-  // Prefer voices that aren't obviously robotic
+  // Prefer voices that sound most natural
   const naturalVoices = voices.filter(v => 
     !v.name.toLowerCase().includes('robotic') &&
     !v.name.toLowerCase().includes('synthetic') &&
-    !v.name.toLowerCase().includes('artificial')
+    !v.name.toLowerCase().includes('artificial') &&
+    !v.name.toLowerCase().includes('system') &&
+    (v.name.toLowerCase().includes('natural') ||
+     v.name.toLowerCase().includes('human') ||
+     v.name.toLowerCase().includes('neural'))
   );
   
   if (naturalVoices.length > 0) {
@@ -875,39 +884,8 @@ function getBestFallbackVoice(characterId, voices) {
 }
 
 function applyCharacterVoiceModifications(utterance, characterId) {
-  // More natural character-specific modifications
-  switch (characterId) {
-    case 'vampire':
-      utterance.rate = Math.max(0.7, utterance.rate - 0.1);
-      utterance.pitch = Math.max(0.8, utterance.pitch - 0.15);
-      utterance.volume = Math.min(1.0, utterance.volume + 0.05);
-      break;
-      
-    case 'zombie':
-      utterance.rate = Math.max(0.6, utterance.rate - 0.2);
-      utterance.pitch = Math.max(0.7, utterance.pitch - 0.2);
-      utterance.volume = Math.max(0.8, utterance.volume - 0.05);
-      break;
-      
-    case 'witch':
-      utterance.rate = Math.min(1.2, utterance.rate + 0.1);
-      utterance.pitch = Math.min(1.3, utterance.pitch + 0.15);
-      utterance.volume = Math.min(1.0, utterance.volume + 0.05);
-      break;
-      
-    case 'werewolf':
-      utterance.rate = Math.max(0.8, utterance.rate - 0.05);
-      utterance.pitch = Math.max(0.9, utterance.pitch - 0.05);
-      utterance.volume = Math.min(1.0, utterance.volume + 0.05);
-      break;
-      
-    case 'default':
-      // SpookyGPT - clear and friendly
-      utterance.rate = Math.max(0.9, utterance.rate - 0.05);
-      utterance.pitch = Math.max(0.95, utterance.pitch - 0.05);
-      utterance.volume = Math.min(1.0, utterance.volume + 0.05);
-      break;
-  }
+  // No modifications - keep voices completely natural and human-like
+  // All characters will sound like normal people with just different voice types
 }
 
 function stopAllSpeech() {
@@ -929,68 +907,68 @@ function loadSpeechConfig() {
     })
     .catch(err => {
       console.warn('Could not load speech config:', err);
-      // Use enhanced default config with subtle effects
+      // Use natural voice config with no effects
       speechConfig = {
         speechEnabled: true,
         characterVoices: {
           default: { 
-            rate: 0.95, 
+            rate: 1.0, 
             pitch: 1.0, 
             volume: 0.9,
             voice: "Google UK English Female",
             effects: {
-              reverb: 0.05,
+              reverb: 0.0,
               echo: 0.0,
               distortion: 0.0,
               lowpass: 1.0
             }
           },
           vampire: { 
-            rate: 0.8, 
-            pitch: 0.85, 
+            rate: 0.9, 
+            pitch: 0.9, 
             volume: 0.9,
             voice: "Google UK English Male",
             effects: {
-              reverb: 0.1,
-              echo: 0.05,
+              reverb: 0.0,
+              echo: 0.0,
               distortion: 0.0,
-              lowpass: 0.95
+              lowpass: 1.0
             }
           },
           witch: { 
-            rate: 1.05, 
-            pitch: 1.15, 
+            rate: 1.0, 
+            pitch: 1.1, 
             volume: 0.9,
             voice: "Google UK English Female",
             effects: {
-              reverb: 0.08,
-              echo: 0.03,
+              reverb: 0.0,
+              echo: 0.0,
               distortion: 0.0,
               lowpass: 1.0
             }
           },
           werewolf: { 
-            rate: 0.9, 
+            rate: 0.95, 
             pitch: 0.95, 
             volume: 0.9,
             voice: "Google UK English Male",
             effects: {
-              reverb: 0.06,
-              echo: 0.02,
-              distortion: 0.05,
-              lowpass: 0.98
+              reverb: 0.0,
+              echo: 0.0,
+              distortion: 0.0,
+              lowpass: 1.0
             }
           },
           zombie: { 
-            rate: 0.7, 
-            pitch: 0.8, 
-            volume: 0.85,
+            rate: 0.8, 
+            pitch: 0.9, 
+            volume: 0.9,
             voice: "Google UK English Male",
             effects: {
-              reverb: 0.15,
-              echo: 0.08,
-              distortion: 0.1,
-              lowpass: 0.85
+              reverb: 0.0,
+              echo: 0.0,
+              distortion: 0.0,
+              lowpass: 1.0
             }
           }
         }
