@@ -31,6 +31,10 @@ let speechConfig = {};
 let musicStateBeforeSpeech = false;
 let isSpeaking = false;
 
+// Audio Context for voice effects
+let audioContext = null;
+let voiceEffects = {};
+
 function updateInputState() {
   if (!currentCharacter) {
     input.disabled = true;
@@ -61,8 +65,7 @@ function disableInputWhileProcessing() {
   sendBtn.textContent = "Thinking...";
   characterSelect.disabled = true;
   speechToggle.disabled = true;
-  musicToggle.disabled = true;
-  // Speech button stays enabled so user can toggle speech while AI is thinking
+  // Music button stays enabled so user can toggle music while AI is thinking
 }
 
 function enableInputAfterProcessing() {
@@ -82,9 +85,12 @@ function disableAllControlsWhileSpeaking() {
   input.disabled = true;
   sendBtn.disabled = true;
   characterSelect.disabled = true;
-  speechButton.disabled = true;
+  speechButton.disabled = false; // Keep speech button enabled for stop functionality
   speechToggle.disabled = true;
   musicToggle.disabled = true;
+  
+  // Change speech button to stop button
+  updateSpeechButtonForSpeaking();
 }
 
 function enableAllControlsAfterSpeaking() {
@@ -97,6 +103,31 @@ function enableAllControlsAfterSpeaking() {
     speechButton.disabled = false;
     speechToggle.disabled = false;
     musicToggle.disabled = false;
+  }
+  
+  // Restore speech button to original state
+  updateSpeechButtonAfterSpeaking();
+}
+
+function updateSpeechButtonForSpeaking() {
+  if (speechButton) {
+    speechButton.textContent = "⏹️ Stop";
+    speechButton.classList.add("speaking");
+  }
+}
+
+function updateSpeechButtonAfterSpeaking() {
+  if (speechButton) {
+    speechButton.classList.remove("speaking");
+    
+    // Restore original button text based on speech state
+    if (speechEnabled) {
+      speechButton.textContent = "🔊 Speech On";
+      speechButton.classList.add("active");
+    } else {
+      speechButton.textContent = "🔇 Speech Off";
+      speechButton.classList.remove("active");
+    }
   }
 }
 
@@ -552,6 +583,139 @@ function cleanTextForSpeech(text) {
     .trim();
 }
 
+// Web Audio API Functions for Voice Effects
+function initializeAudioContext() {
+  if (!audioContext) {
+    try {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    } catch (e) {
+      console.warn('Web Audio API not supported:', e);
+      return false;
+    }
+  }
+  return true;
+}
+
+function createVoiceEffects(characterId) {
+  if (!initializeAudioContext()) return null;
+  
+  const characterVoice = speechConfig.characterVoices?.[characterId] || speechConfig.characterVoices?.default;
+  const effects = characterVoice?.effects || {};
+  
+  // Create audio nodes with cleaner routing
+  const source = audioContext.createGain();
+  const outputGain = audioContext.createGain();
+  const dryGain = audioContext.createGain();
+  const wetGain = audioContext.createGain();
+  
+  // Always connect dry signal for clarity
+  source.connect(dryGain);
+  dryGain.connect(outputGain);
+  
+  // Configure subtle reverb
+  if (effects.reverb > 0) {
+    const reverbBuffer = createSubtleReverbBuffer(effects.reverb);
+    const convolver = audioContext.createConvolver();
+    convolver.buffer = reverbBuffer;
+    
+    source.connect(wetGain);
+    wetGain.connect(convolver);
+    convolver.connect(outputGain);
+    
+    // Balance dry and wet signals
+    dryGain.gain.value = 0.8;
+    wetGain.gain.value = effects.reverb * 0.3;
+  } else {
+    dryGain.gain.value = 1.0;
+    wetGain.gain.value = 0;
+  }
+  
+  // Configure subtle echo
+  if (effects.echo > 0) {
+    const delay = audioContext.createDelay(0.5);
+    const feedback = audioContext.createGain();
+    const echoGain = audioContext.createGain();
+    
+    delay.delayTime.value = 0.2; // Shorter delay for clarity
+    feedback.gain.value = effects.echo * 0.2; // Less feedback
+    echoGain.gain.value = effects.echo * 0.4;
+    
+    source.connect(delay);
+    delay.connect(feedback);
+    feedback.connect(delay);
+    delay.connect(echoGain);
+    echoGain.connect(outputGain);
+  }
+  
+  // Configure subtle distortion
+  if (effects.distortion > 0) {
+    const distortion = audioContext.createWaveShaper();
+    distortion.curve = createSubtleDistortionCurve(effects.distortion);
+    distortion.oversample = '2x'; // Less oversampling for clarity
+    
+    const distortionGain = audioContext.createGain();
+    distortionGain.gain.value = effects.distortion * 0.5; // Reduce distortion level
+    
+    source.connect(distortion);
+    distortion.connect(distortionGain);
+    distortionGain.connect(outputGain);
+  }
+  
+  // Configure gentle lowpass filter
+  if (effects.lowpass < 1.0) {
+    const lowpassFilter = audioContext.createBiquadFilter();
+    lowpassFilter.type = 'lowpass';
+    lowpassFilter.frequency.value = 3000 + (effects.lowpass * 2000); // Higher frequency for clarity
+    lowpassFilter.Q.value = 0.5; // Gentler filter
+    
+    source.connect(lowpassFilter);
+    lowpassFilter.connect(outputGain);
+  }
+  
+  outputGain.gain.value = 0.9; // Higher output volume
+  
+  return {
+    source,
+    output: outputGain,
+    cleanup: () => {
+      try {
+        source.disconnect();
+        outputGain.disconnect();
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+    }
+  };
+}
+
+function createSubtleReverbBuffer(amount) {
+  const length = audioContext.sampleRate * 1; // Shorter reverb
+  const buffer = audioContext.createBuffer(2, length, audioContext.sampleRate);
+  
+  for (let channel = 0; channel < 2; channel++) {
+    const channelData = buffer.getChannelData(channel);
+    for (let i = 0; i < length; i++) {
+      // More subtle reverb with smoother decay
+      channelData[i] = (Math.random() * 2 - 1) * amount * 0.3 * Math.pow(1 - i / length, 3);
+    }
+  }
+  
+  return buffer;
+}
+
+function createSubtleDistortionCurve(amount) {
+  const samples = 44100;
+  const curve = new Float32Array(samples);
+  
+  for (let i = 0; i < samples; i++) {
+    const x = (i * 2) / samples - 1;
+    // Much gentler distortion curve
+    curve[i] = Math.tanh(x * (1 + amount * 2)) * 0.8;
+  }
+  
+  return curve;
+}
+
 function initializeSpeechSynthesis() {
   if (!('speechSynthesis' in window)) {
     console.warn('Speech synthesis not supported');
@@ -605,21 +769,27 @@ function speakText(text, characterId) {
     const selectedVoice = voices.find(voice => voice.name === characterVoice.voice);
     if (selectedVoice) {
       utterance.voice = selectedVoice;
+    } else {
+      // Fallback to best available voice for character type
+      const fallbackVoice = getBestFallbackVoice(characterId, voices);
+      if (fallbackVoice) {
+        utterance.voice = fallbackVoice;
+      }
     }
   }
+
+  // Create voice effects for this character
+  const voiceEffects = createVoiceEffects(characterId);
   
-  // Add some character-specific speech modifications
-  if (characterId === 'vampire') {
-    utterance.rate = Math.max(0.5, utterance.rate - 0.2);
-    utterance.pitch = Math.max(0.5, utterance.pitch - 0.3);
-  } else if (characterId === 'zombie') {
-    utterance.rate = Math.max(0.3, utterance.rate - 0.3);
-    utterance.pitch = Math.max(0.3, utterance.pitch - 0.3);
-  } else if (characterId === 'witch') {
-    utterance.pitch = Math.min(2.0, utterance.pitch + 0.2);
-  }
+  // Enhanced character-specific speech modifications
+  applyCharacterVoiceModifications(utterance, characterId);
 
   utterance.onend = () => {
+    // Clean up voice effects
+    if (voiceEffects) {
+      voiceEffects.cleanup();
+    }
+    
     // Re-enable all controls after speaking
     enableAllControlsAfterSpeaking();
     
@@ -636,6 +806,11 @@ function speakText(text, characterId) {
   };
 
   utterance.onerror = () => {
+    // Clean up voice effects
+    if (voiceEffects) {
+      voiceEffects.cleanup();
+    }
+    
     // Re-enable all controls even if there's an error
     enableAllControlsAfterSpeaking();
     
@@ -654,6 +829,87 @@ function speakText(text, characterId) {
   window.speechSynthesis.speak(utterance);
 }
 
+function getBestFallbackVoice(characterId, voices) {
+  // Prioritize clearer, more natural voices
+  const voicePreferences = {
+    vampire: ['google', 'male', 'british', 'english', 'us'],
+    witch: ['google', 'female', 'british', 'english', 'us'],
+    werewolf: ['google', 'male', 'british', 'english', 'us'],
+    zombie: ['google', 'male', 'british', 'english', 'us'],
+    default: ['google', 'female', 'british', 'english', 'us']
+  };
+  
+  const preferences = voicePreferences[characterId] || voicePreferences.default;
+  
+  // First try to find Google voices (usually clearest)
+  for (const preference of preferences) {
+    const voice = voices.find(v => 
+      v.name.toLowerCase().includes(preference) && 
+      v.name.toLowerCase().includes('google')
+    );
+    if (voice) return voice;
+  }
+  
+  // Then try any voice with preferences
+  for (const preference of preferences) {
+    const voice = voices.find(v => 
+      v.name.toLowerCase().includes(preference) || 
+      v.lang.toLowerCase().includes(preference)
+    );
+    if (voice) return voice;
+  }
+  
+  // Prefer voices that aren't obviously robotic
+  const naturalVoices = voices.filter(v => 
+    !v.name.toLowerCase().includes('robotic') &&
+    !v.name.toLowerCase().includes('synthetic') &&
+    !v.name.toLowerCase().includes('artificial')
+  );
+  
+  if (naturalVoices.length > 0) {
+    return naturalVoices[0];
+  }
+  
+  // Fallback to first available voice
+  return voices[0] || null;
+}
+
+function applyCharacterVoiceModifications(utterance, characterId) {
+  // More natural character-specific modifications
+  switch (characterId) {
+    case 'vampire':
+      utterance.rate = Math.max(0.7, utterance.rate - 0.1);
+      utterance.pitch = Math.max(0.8, utterance.pitch - 0.15);
+      utterance.volume = Math.min(1.0, utterance.volume + 0.05);
+      break;
+      
+    case 'zombie':
+      utterance.rate = Math.max(0.6, utterance.rate - 0.2);
+      utterance.pitch = Math.max(0.7, utterance.pitch - 0.2);
+      utterance.volume = Math.max(0.8, utterance.volume - 0.05);
+      break;
+      
+    case 'witch':
+      utterance.rate = Math.min(1.2, utterance.rate + 0.1);
+      utterance.pitch = Math.min(1.3, utterance.pitch + 0.15);
+      utterance.volume = Math.min(1.0, utterance.volume + 0.05);
+      break;
+      
+    case 'werewolf':
+      utterance.rate = Math.max(0.8, utterance.rate - 0.05);
+      utterance.pitch = Math.max(0.9, utterance.pitch - 0.05);
+      utterance.volume = Math.min(1.0, utterance.volume + 0.05);
+      break;
+      
+    case 'default':
+      // SpookyGPT - clear and friendly
+      utterance.rate = Math.max(0.9, utterance.rate - 0.05);
+      utterance.pitch = Math.max(0.95, utterance.pitch - 0.05);
+      utterance.volume = Math.min(1.0, utterance.volume + 0.05);
+      break;
+  }
+}
+
 function stopAllSpeech() {
   if (window.speechSynthesis) {
     window.speechSynthesis.cancel();
@@ -668,19 +924,75 @@ function loadSpeechConfig() {
     .then(res => res.json())
     .then(config => {
       speechConfig = config;
+      console.log('Loaded speech config:', speechConfig);
       loadVoices();
     })
     .catch(err => {
       console.warn('Could not load speech config:', err);
-      // Use default config
+      // Use enhanced default config with subtle effects
       speechConfig = {
         speechEnabled: true,
         characterVoices: {
-          default: { rate: 0.9, pitch: 1.0, volume: 0.8 },
-          vampire: { rate: 0.7, pitch: 0.8, volume: 0.9 },
-          witch: { rate: 1.0, pitch: 1.2, volume: 0.8 },
-          werewolf: { rate: 0.8, pitch: 0.9, volume: 0.9 },
-          zombie: { rate: 0.6, pitch: 0.7, volume: 0.7 }
+          default: { 
+            rate: 0.95, 
+            pitch: 1.0, 
+            volume: 0.9,
+            voice: "Google UK English Female",
+            effects: {
+              reverb: 0.05,
+              echo: 0.0,
+              distortion: 0.0,
+              lowpass: 1.0
+            }
+          },
+          vampire: { 
+            rate: 0.8, 
+            pitch: 0.85, 
+            volume: 0.9,
+            voice: "Google UK English Male",
+            effects: {
+              reverb: 0.1,
+              echo: 0.05,
+              distortion: 0.0,
+              lowpass: 0.95
+            }
+          },
+          witch: { 
+            rate: 1.05, 
+            pitch: 1.15, 
+            volume: 0.9,
+            voice: "Google UK English Female",
+            effects: {
+              reverb: 0.08,
+              echo: 0.03,
+              distortion: 0.0,
+              lowpass: 1.0
+            }
+          },
+          werewolf: { 
+            rate: 0.9, 
+            pitch: 0.95, 
+            volume: 0.9,
+            voice: "Google UK English Male",
+            effects: {
+              reverb: 0.06,
+              echo: 0.02,
+              distortion: 0.05,
+              lowpass: 0.98
+            }
+          },
+          zombie: { 
+            rate: 0.7, 
+            pitch: 0.8, 
+            volume: 0.85,
+            voice: "Google UK English Male",
+            effects: {
+              reverb: 0.15,
+              echo: 0.08,
+              distortion: 0.1,
+              lowpass: 0.85
+            }
+          }
         }
       };
       loadVoices();
@@ -691,18 +1003,33 @@ function loadVoices() {
   // Ensure voices are loaded
   if (window.speechSynthesis.getVoices().length === 0) {
     window.speechSynthesis.addEventListener('voiceschanged', () => {
-      console.log('Voices loaded:', window.speechSynthesis.getVoices().length);
+      const voices = window.speechSynthesis.getVoices();
+      console.log('Voices loaded:', voices.length);
+      console.log('Available voices:', voices.map(v => `${v.name} (${v.lang})`));
+      
+      // Log which voices we'll try to use for each character
+      Object.keys(speechConfig.characterVoices || {}).forEach(characterId => {
+        const config = speechConfig.characterVoices[characterId];
+        const voice = voices.find(v => v.name === config.voice);
+        if (voice) {
+          console.log(`✅ ${characterId}: Using "${voice.name}"`);
+        } else {
+          console.log(`⚠️ ${characterId}: Voice "${config.voice}" not found, will use fallback`);
+        }
+      });
     });
   } else {
-    console.log('Voices already loaded:', window.speechSynthesis.getVoices().length);
+    const voices = window.speechSynthesis.getVoices();
+    console.log('Voices already loaded:', voices.length);
+    console.log('Available voices:', voices.map(v => `${v.name} (${v.lang})`));
   }
 }
 
 // Event listeners
 sendBtn.addEventListener("click", () => sendMessage());
 musicToggle.addEventListener("click", (e) => {
-  // TRIPLE-CHECK: prevent music toggle while processing, speaking, OR cooldown
-  if (isWaitingForResponse || isSpeaking || cooldownActive) {
+  // Prevent music toggle while speaking or during cooldown
+  if (isSpeaking || cooldownActive) {
     e.preventDefault();
     e.stopPropagation();
     return;
@@ -712,7 +1039,13 @@ musicToggle.addEventListener("click", (e) => {
 
 // Speech toggle event listener
 if (speechButton) {
-  speechButton.addEventListener("click", () => toggleSpeech());
+  speechButton.addEventListener("click", () => {
+    if (isSpeaking) {
+      stopAllSpeech();
+    } else {
+      toggleSpeech();
+    }
+  });
 }
 
 input.addEventListener("keydown", (e) => {

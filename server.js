@@ -280,6 +280,76 @@ app.get("/api/characters", (req, res) => {
   res.json({ characters });
 });
 
+// Speech configuration endpoint
+app.get("/api/speech-config", (req, res) => {
+  const speechConfig = {
+    speechEnabled: true,
+    characterVoices: {
+      default: { 
+        rate: 0.95, 
+        pitch: 1.0, 
+        volume: 0.9,
+        voice: "Google UK English Female",
+        effects: {
+          reverb: 0.05,
+          echo: 0.0,
+          distortion: 0.0,
+          lowpass: 1.0
+        }
+      },
+      vampire: { 
+        rate: 0.8, 
+        pitch: 0.85, 
+        volume: 0.9,
+        voice: "Google UK English Male",
+        effects: {
+          reverb: 0.1,
+          echo: 0.05,
+          distortion: 0.0,
+          lowpass: 0.95
+        }
+      },
+      witch: { 
+        rate: 1.05, 
+        pitch: 1.15, 
+        volume: 0.9,
+        voice: "Google UK English Female",
+        effects: {
+          reverb: 0.08,
+          echo: 0.03,
+          distortion: 0.0,
+          lowpass: 1.0
+        }
+      },
+      werewolf: { 
+        rate: 0.9, 
+        pitch: 0.95, 
+        volume: 0.9,
+        voice: "Google UK English Male",
+        effects: {
+          reverb: 0.06,
+          echo: 0.02,
+          distortion: 0.05,
+          lowpass: 0.98
+        }
+      },
+      zombie: { 
+        rate: 0.7, 
+        pitch: 0.8, 
+        volume: 0.85,
+        voice: "Google UK English Male",
+        effects: {
+          reverb: 0.15,
+          echo: 0.08,
+          distortion: 0.1,
+          lowpass: 0.85
+        }
+      }
+    }
+  };
+  res.json(speechConfig);
+});
+
 
 // Fallback route - serve index.html for any unmatched routes
 app.use((req, res) => {

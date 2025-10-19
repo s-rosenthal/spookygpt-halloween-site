@@ -168,6 +168,26 @@
       background: rgba(255, 69, 0, 0.2);
     }
 
+    .speech-btn.speaking {
+      border-color: rgba(220, 20, 60, 0.8);
+      background: rgba(220, 20, 60, 0.3);
+      animation: pulse-red 1.5s ease-in-out infinite;
+    }
+
+    .speech-btn.speaking:hover {
+      border-color: rgba(220, 20, 60, 1);
+      background: rgba(220, 20, 60, 0.4);
+    }
+
+    @keyframes pulse-red {
+      0%, 100% {
+        box-shadow: 0 0 0 0 rgba(220, 20, 60, 0.4);
+      }
+      50% {
+        box-shadow: 0 0 0 10px rgba(220, 20, 60, 0);
+      }
+    }
+
     .speech-btn:focus {
       outline: none;
       border-color: rgba(255, 69, 0, 0.6);
