@@ -154,6 +154,14 @@ extension BLEManager: CBCentralManagerDelegate {
         statusMessage = "Disconnected from \(deviceName)"
         connectedPeripheral = nil
         targetCharacteristic = nil
+        
+        // Attempt to reconnect after a short delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            if !self.isConnected {
+                self.statusMessage = "Attempting to reconnect..."
+                self.startScanning()
+            }
+        }
     }
 }
 
@@ -199,6 +207,7 @@ class APIManager: ObservableObject {
     // Background task management
     private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
     private var backgroundTimer: Timer?
+    weak var appState: AppState?
     
     init(baseURL: String) {
         self.baseURL = baseURL
@@ -206,6 +215,10 @@ class APIManager: ObservableObject {
     
     func setBLEManager(_ bleManager: BLEManager) {
         self.bleManager = bleManager
+    }
+    
+    func setAppState(_ appState: AppState) {
+        self.appState = appState
     }
     
     func login(password: String, completion: @escaping (Bool, String?) -> Void) {
@@ -321,6 +334,9 @@ class APIManager: ObservableObject {
     private func handleBackgroundAppRefresh(task: BGAppRefreshTask) {
         print("🔄 Background app refresh triggered")
         
+        // Record the background refresh
+        appState?.recordBackgroundRefresh()
+        
         // Schedule multiple future background refreshes
         scheduleBackgroundAppRefresh()
         scheduleImmediateBackgroundRefresh()
@@ -354,6 +370,9 @@ class APIManager: ObservableObject {
             print("⚠️ Background task expiring, rescheduling...")
             self.endBackgroundTask()
             
+            // Update app state
+            self.appState?.updateBackgroundTaskStatus(taskID: .invalid)
+            
             // Immediately reschedule a new background task
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 self.registerBackgroundTask()
@@ -361,6 +380,9 @@ class APIManager: ObservableObject {
         }
         
         print("🔄 Background task registered with ID: \(backgroundTaskID.rawValue)")
+        
+        // Update app state with new task ID
+        appState?.updateBackgroundTaskStatus(taskID: backgroundTaskID)
         
         // Also schedule a background refresh task
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
@@ -493,6 +515,9 @@ struct HalloweenLEDApp: App {
 class AppState: ObservableObject {
     @Published var isInBackground = false
     @Published var backgroundTaskActive = false
+    @Published var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
+    @Published var lastBackgroundRefresh: Date?
+    @Published var backgroundRefreshCount = 0
     
     func handleBackgroundTransition() {
         isInBackground = true
@@ -509,6 +534,15 @@ class AppState: ObservableObject {
         isInBackground = false
         backgroundTaskActive = false
         print("📱 App entered foreground")
+    }
+    
+    func updateBackgroundTaskStatus(taskID: UIBackgroundTaskIdentifier) {
+        backgroundTaskID = taskID
+    }
+    
+    func recordBackgroundRefresh() {
+        lastBackgroundRefresh = Date()
+        backgroundRefreshCount += 1
     }
     
     private func scheduleBackgroundAppRefresh() {
@@ -569,6 +603,9 @@ struct ContentView: View {
                             status: apiManager.isPolling ? "Polling" : "Stopped",
                             color: apiManager.isPolling ? .green : .orange
                         )
+                        
+                        // Background Task Status
+                        BackgroundTaskStatusCard(appState: appState)
                     }
                 
                 // LED Status
@@ -694,6 +731,9 @@ struct ContentView: View {
         .onAppear {
             // Set BLE manager reference in API manager
             apiManager.setBLEManager(bleManager)
+            
+            // Set app state reference in API manager
+            apiManager.setAppState(appState)
             
             // Auto-connect to ESP32
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
@@ -993,6 +1033,66 @@ struct SimpleColorPicker: View {
     }
 }
 
+
+// MARK: - Background Task Status Card
+struct BackgroundTaskStatusCard: View {
+    @ObservedObject var appState: AppState
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("🔄 Background Tasks")
+                    .font(.headline)
+                Spacer()
+                Text(appState.backgroundTaskActive ? "Active" : "Inactive")
+                    .font(.subheadline)
+                    .foregroundColor(appState.backgroundTaskActive ? .green : .orange)
+                    .fontWeight(.semibold)
+            }
+            
+            if appState.backgroundTaskActive {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("Task ID:")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Text("\(appState.backgroundTaskID.rawValue)")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                    }
+                    
+                    HStack {
+                        Text("Refresh Count:")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Text("\(appState.backgroundRefreshCount)")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.blue)
+                    }
+                    
+                    if let lastRefresh = appState.lastBackgroundRefresh {
+                        HStack {
+                            Text("Last Refresh:")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Text(lastRefresh, style: .relative)
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundColor(.green)
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
+    }
+}
 
 // MARK: - Preview
 struct ContentView_Previews: PreviewProvider {
