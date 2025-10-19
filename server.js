@@ -103,7 +103,7 @@ app.post("/api/chat", async (req, res) => {
         stream: true,
         options: {
           temperature: settings.temperature || 0.6,
-          num_predict: settings.maxTokens || 69,
+          num_predict: settings.maxTokens || 150,
         }
       }),
     });

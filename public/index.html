@@ -139,6 +139,43 @@
       width: 100%;
     }
 
+    /* Speech toggle styling */
+    .speech-toggle {
+      margin: 0.5rem 0;
+      display: flex;
+      justify-content: center;
+    }
+
+    .speech-btn {
+      padding: 0.8rem 1.5rem;
+      font-size: 1rem;
+      min-height: 2.5rem;
+      border-radius: 12px;
+      border: 2px solid rgba(255, 140, 0, 0.3);
+      background: rgba(26, 10, 10, 0.8);
+      color: #f0e6d2;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .speech-btn:hover {
+      border-color: rgba(255, 140, 0, 0.5);
+      background: rgba(255, 140, 0, 0.1);
+    }
+
+    .speech-btn.active {
+      border-color: rgba(255, 69, 0, 0.6);
+      background: rgba(255, 69, 0, 0.2);
+    }
+
+    .speech-btn:focus {
+      outline: none;
+      border-color: rgba(255, 69, 0, 0.6);
+      box-shadow: 0 0 0 3px rgba(255, 69, 0, 0.2);
+    }
+
+
+
     select:hover, button:hover {
       background: rgba(255, 69, 0, 0.35);
       border-color: rgba(255, 69, 0, 0.6);
@@ -147,18 +184,6 @@
     button:disabled {
       opacity: 0.6;
       cursor: not-allowed;
-    }
-
-    .clear-btn {
-      background: linear-gradient(135deg, #dc143c, #8b0000, #b71c1c);
-      border-color: rgba(220, 20, 60, 0.6);
-    }
-
-    .clear-btn:hover {
-      background: linear-gradient(135deg, #ff1744, #b71c1c, #d32f2f);
-      box-shadow: 
-        0 8px 25px rgba(220, 20, 60, 0.6),
-        0 0 30px rgba(255, 23, 68, 0.4);
     }
 
     .music-btn {
@@ -531,7 +556,6 @@
     <div class="controls">
       <div class="button-group">
         <button id="musicToggle" class="music-btn">🎵 Music On</button>
-        <button id="clear" class="clear-btn">🧹 Clear Chat</button>
       </div>
     </div>
 
@@ -541,13 +565,22 @@
       </select>
     </div>
 
-    <div id="input-area">
-      <textarea id="prompt" placeholder="Ask something spooky..." rows="3"></textarea>
-      <div id="cooldownDisplay">
-        Cooldown: <span id="cooldownTimer">0</span>s
-      </div>
-      <button id="send">Send</button>
+    <!-- Mode Selection (hidden until character is selected) -->
+    <div class="speech-toggle" id="speechToggle" style="display: none;">
+      <button id="speechButton" class="speech-btn">🔇 Speech Off</button>
     </div>
+
+    <!-- Text Mode Interface -->
+    <div id="text-mode-interface">
+      <div id="input-area">
+        <textarea id="prompt" placeholder="Ask something spooky..." rows="3"></textarea>
+        <div id="cooldownDisplay">
+          Cooldown: <span id="cooldownTimer">0</span>s
+        </div>
+        <button id="send">Send</button>
+      </div>
+    </div>
+
 
     <div id="chat"></div>
   </div>

@@ -28,7 +28,7 @@
   },
   "settings": {
     "defaultCharacter": "default",
-    "maxTokens": 280,
+    "maxTokens": 150,
     "temperature": 0.4,
     "streamingEnabled": true,
     "responseDelay": 5
