@@ -280,19 +280,97 @@ class APIManager: ObservableObject {
         // Ensure timer continues in background
         RunLoop.current.add(pollingTimer!, forMode: .common)
         
-        // Register for background task
+        // Register for background task with longer duration
         registerBackgroundTask()
+        
+        // Also register for background app refresh
+        registerBackgroundAppRefresh()
+        
+        // Schedule immediate background refresh
+        scheduleImmediateBackgroundRefresh()
+    }
+    
+    private func scheduleImmediateBackgroundRefresh() {
+        let request = BGAppRefreshTaskRequest(identifier: "com.spookygpt.led-polling")
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 30) // 30 seconds from now
+        
+        do {
+            try BGTaskScheduler.shared.submit(request)
+            print("📅 Immediate background refresh scheduled for 30 seconds")
+        } catch {
+            print("❌ Could not schedule immediate background refresh: \(error)")
+        }
+    }
+    
+    private func registerBackgroundAppRefresh() {
+        // Request background app refresh permission
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
+            if granted {
+                print("Background app refresh permission granted")
+            } else {
+                print("Background app refresh permission denied: \(error?.localizedDescription ?? "Unknown error")")
+            }
+        }
+        
+        // Register background task identifier
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: "com.spookygpt.led-polling", using: nil) { task in
+            self.handleBackgroundAppRefresh(task: task as! BGAppRefreshTask)
+        }
+    }
+    
+    private func handleBackgroundAppRefresh(task: BGAppRefreshTask) {
+        print("🔄 Background app refresh triggered")
+        
+        // Schedule multiple future background refreshes
+        scheduleBackgroundAppRefresh()
+        scheduleImmediateBackgroundRefresh()
+        
+        // Perform the LED status check
+        fetchLEDStatus()
+        
+        // Mark task as completed
+        task.setTaskCompleted(success: true)
+        print("✅ Background app refresh completed")
+    }
+    
+    private func scheduleBackgroundAppRefresh() {
+        let request = BGAppRefreshTaskRequest(identifier: "com.spookygpt.led-polling")
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 2 * 60) // 2 minutes from now
+        
+        do {
+            try BGTaskScheduler.shared.submit(request)
+            print("📅 Background app refresh scheduled for 2 minutes")
+        } catch {
+            print("❌ Could not schedule background app refresh: \(error)")
+        }
     }
     
     private func registerBackgroundTask() {
+        // End any existing background task first
+        endBackgroundTask()
+        
         backgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "LEDPolling") {
             // This block is called when the background task is about to expire
+            print("⚠️ Background task expiring, rescheduling...")
             self.endBackgroundTask()
+            
+            // Immediately reschedule a new background task
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self.registerBackgroundTask()
+            }
+        }
+        
+        print("🔄 Background task registered with ID: \(backgroundTaskID.rawValue)")
+        
+        // Also schedule a background refresh task
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            self.scheduleBackgroundAppRefresh()
         }
     }
     
     private func endBackgroundTask() {
         if backgroundTaskID != .invalid {
+            print("Ending background task with ID: \(backgroundTaskID.rawValue)")
             UIApplication.shared.endBackgroundTask(backgroundTaskID)
             backgroundTaskID = .invalid
         }
@@ -313,11 +391,13 @@ class APIManager: ObservableObject {
     private func fetchLEDStatus() {
         guard let url = URL(string: "\(baseURL)/api/admin/led/status") else {
             lastError = "Invalid URL"
+            print("❌ Invalid URL: \(baseURL)/api/admin/led/status")
             return
         }
         
         guard let token = authToken else {
             lastError = "Not authenticated"
+            print("❌ Not authenticated - no auth token")
             return
         }
         
@@ -325,15 +405,19 @@ class APIManager: ObservableObject {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
+        print("🔄 Fetching LED status from: \(url)")
+        
         URLSession.shared.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
                 if let error = error {
                     self.lastError = "Network error: \(error.localizedDescription)"
+                    print("❌ Network error: \(error.localizedDescription)")
                     return
                 }
                 
                 guard let data = data else {
                     self.lastError = "No data received"
+                    print("❌ No data received")
                     return
                 }
                 
@@ -342,23 +426,38 @@ class APIManager: ObservableObject {
                     self.ledStatus = status
                     self.lastError = nil
                     
+                    print("✅ LED Status: totalQueries=\(status.totalQueries), lastProcessed=\(self.lastProcessedQueryCount), isFirstFetch=\(self.isFirstFetch)")
+                    
                     // Handle first fetch - just set baseline, don't trigger animation
                     if self.isFirstFetch {
                         self.lastProcessedQueryCount = status.totalQueries
                         self.isFirstFetch = false
+                        print("📊 First fetch - set baseline to \(status.totalQueries)")
                     } else {
                         // Check if query count increased (new query received)
                         if status.totalQueries > self.lastProcessedQueryCount {
+                            let newQueries = status.totalQueries - self.lastProcessedQueryCount
                             self.lastProcessedQueryCount = status.totalQueries
+                            
+                            print("🎉 New queries detected! Count increased by \(newQueries)")
                             
                             // Send LED command to ESP32 if connected
                             if let bleManager = self.bleManager, bleManager.isConnected {
+                                print("📱 Sending LED command to ESP32")
                                 self.sendQueryLEDCommand(bleManager: bleManager)
+                            } else {
+                                print("⚠️ ESP32 not connected - cannot send LED command")
                             }
+                        } else {
+                            print("📊 No new queries since last check")
                         }
                     }
                 } catch {
                     self.lastError = "JSON error: \(error.localizedDescription)"
+                    print("❌ JSON error: \(error.localizedDescription)")
+                    if let dataString = String(data: data, encoding: .utf8) {
+                        print("Raw response: \(dataString)")
+                    }
                 }
             }
         }.resume()
@@ -393,15 +492,35 @@ struct HalloweenLEDApp: App {
 // MARK: - App State Manager
 class AppState: ObservableObject {
     @Published var isInBackground = false
+    @Published var backgroundTaskActive = false
     
     func handleBackgroundTransition() {
         isInBackground = true
-        print("App entered background - continuing LED polling")
+        backgroundTaskActive = true
+        print("📱 App entered background - continuing LED polling")
+        
+        // Schedule background app refresh when entering background
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            self.scheduleBackgroundAppRefresh()
+        }
     }
     
     func handleForegroundTransition() {
         isInBackground = false
-        print("App entered foreground")
+        backgroundTaskActive = false
+        print("📱 App entered foreground")
+    }
+    
+    private func scheduleBackgroundAppRefresh() {
+        let request = BGAppRefreshTaskRequest(identifier: "com.spookygpt.led-polling")
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 1 * 60) // 1 minute from now
+        
+        do {
+            try BGTaskScheduler.shared.submit(request)
+            print("📅 Background app refresh scheduled for 1 minute")
+        } catch {
+            print("❌ Could not schedule background app refresh: \(error)")
+        }
     }
 }
 

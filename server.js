@@ -281,8 +281,8 @@ app.get("/api/characters", (req, res) => {
 });
 
 
-// Fallback route
-app.get("*", (_, res) => {
+// Fallback route - serve index.html for any unmatched routes
+app.use((req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
