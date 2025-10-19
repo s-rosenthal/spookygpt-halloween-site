@@ -9,6 +9,8 @@
 import SwiftUI
 import CoreBluetooth
 import Foundation
+import BackgroundTasks
+import UserNotifications
 
 // MARK: - Color Utilities
 extension Color {
@@ -194,6 +196,10 @@ class APIManager: ObservableObject {
     weak var bleManager: BLEManager?
     var selectedColor: Color = .orange
     
+    // Background task management
+    private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
+    private var backgroundTimer: Timer?
+    
     init(baseURL: String) {
         self.baseURL = baseURL
     }
@@ -261,9 +267,34 @@ class APIManager: ObservableObject {
         // Initial fetch
         fetchLEDStatus()
         
-        // Set up timer
+        // Set up timer with background execution support
+        setupBackgroundPolling(interval: interval)
+    }
+    
+    private func setupBackgroundPolling(interval: TimeInterval) {
+        // Create timer that works in background
         pollingTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in
             self.fetchLEDStatus()
+        }
+        
+        // Ensure timer continues in background
+        RunLoop.current.add(pollingTimer!, forMode: .common)
+        
+        // Register for background task
+        registerBackgroundTask()
+    }
+    
+    private func registerBackgroundTask() {
+        backgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "LEDPolling") {
+            // This block is called when the background task is about to expire
+            self.endBackgroundTask()
+        }
+    }
+    
+    private func endBackgroundTask() {
+        if backgroundTaskID != .invalid {
+            UIApplication.shared.endBackgroundTask(backgroundTaskID)
+            backgroundTaskID = .invalid
         }
     }
     
@@ -271,7 +302,10 @@ class APIManager: ObservableObject {
     func stopPolling() {
         pollingTimer?.invalidate()
         pollingTimer = nil
+        backgroundTimer?.invalidate()
+        backgroundTimer = nil
         isPolling = false
+        endBackgroundTask()
         // Reset first fetch flag so next start will establish new baseline
         isFirstFetch = true
     }
@@ -340,10 +374,34 @@ class APIManager: ObservableObject {
 // MARK: - Main App
 @main
 struct HalloweenLEDApp: App {
+    @StateObject private var appState = AppState()
+    
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(appState)
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+                    appState.handleBackgroundTransition()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+                    appState.handleForegroundTransition()
+                }
         }
+    }
+}
+
+// MARK: - App State Manager
+class AppState: ObservableObject {
+    @Published var isInBackground = false
+    
+    func handleBackgroundTransition() {
+        isInBackground = true
+        print("App entered background - continuing LED polling")
+    }
+    
+    func handleForegroundTransition() {
+        isInBackground = false
+        print("App entered foreground")
     }
 }
 
@@ -351,6 +409,7 @@ struct HalloweenLEDApp: App {
 struct ContentView: View {
     @StateObject private var bleManager = BLEManager()
     @StateObject private var apiManager = APIManager(baseURL: "https://treasa-apterygial-magdalen.ngrok-free.dev")
+    @EnvironmentObject var appState: AppState
     @State private var websiteURL = "https://treasa-apterygial-magdalen.ngrok-free.dev"
     @State private var showingSettings = false
     @State private var showingLogin = false
