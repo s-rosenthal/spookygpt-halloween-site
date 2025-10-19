@@ -94,6 +94,18 @@
       margin: 0;
     }
 
+    /* Button group styling */
+    .button-group {
+      display: flex;
+      gap: 0.5rem;
+      width: 100%;
+    }
+
+    .button-group button {
+      flex: 1;
+      margin: 0;
+    }
+
     /* Form elements */
     select, button {
       padding: 0.6rem 0.8rem;
@@ -110,6 +122,21 @@
         0 4px 15px rgba(255, 69, 0, 0.3),
         inset 0 1px 0 rgba(255, 255, 255, 0.1);
       text-align: center;
+    }
+
+    /* Character selection styling */
+    .character-selection {
+      margin: 1rem 0;
+      display: flex;
+      justify-content: center;
+    }
+
+    .character-selection #character {
+      padding: 1rem 1.2rem;
+      font-size: 1.1rem;
+      min-height: 3rem;
+      max-width: 300px;
+      width: 100%;
     }
 
     select:hover, button:hover {
@@ -192,7 +219,7 @@
       line-height: 1.6;
       position: relative;
       overflow: hidden;
-      font-size: 0.95rem;
+      font-size: 2rem;
       backdrop-filter: blur(10px);
       box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
       border: 1px solid rgba(255, 255, 255, 0.1);
@@ -257,7 +284,7 @@
       z-index: 0;
     }
 
-    input {
+    textarea {
       flex: 1;
       padding: 0.6rem 0.8rem;
       border: none;
@@ -272,9 +299,14 @@
         inset 0 1px 0 rgba(255, 255, 255, 0.1);
       position: relative;
       z-index: 1;
+      resize: vertical;
+      min-height: 3rem;
+      max-height: 8rem;
+      font-family: inherit;
+      line-height: 1.4;
     }
 
-    input:focus {
+    textarea:focus {
       outline: none;
       background: rgba(255, 69, 0, 0.25);
       box-shadow: 
@@ -283,7 +315,7 @@
       border-color: rgba(255, 69, 0, 0.6);
     }
 
-    input::placeholder {
+    textarea::placeholder {
       color: rgba(255, 255, 255, 0.7);
       font-style: italic;
     }
@@ -403,28 +435,6 @@
       box-shadow: 0 6px 20px rgba(255, 69, 0, 0.6);
     }
 
-    /* Query counter */
-    #queryCounter {
-      order: -1;
-      text-align: center;
-      font-size: 0.75rem;
-      padding: 0.4rem 0.6rem;
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      border-radius: 12px;
-      background: rgba(255, 140, 0, 0.2);
-      border: 2px solid rgba(255, 140, 0, 0.4);
-      color: #f0e6d2;
-      font-weight: 600;
-      box-shadow: 0 4px 15px rgba(255, 69, 0, 0.2);
-      backdrop-filter: blur(10px);
-    }
-
-    #sessionCount {
-      color: #ff4500;
-      font-weight: 700;
-    }
 
     /* Cooldown display */
     #cooldownDisplay {
@@ -463,7 +473,7 @@
       .msg {
         margin: 0.25rem 0;
         padding: 0.6rem 0.8rem;
-        font-size: 0.85rem;
+        font-size: 1.1rem;
         border-radius: 12px;
       }
       
@@ -519,18 +529,20 @@
     </div>
 
     <div class="controls">
-      <select id="character">
-        <option value="default">Choose Character...</option>
-      </select>
-      <button id="musicToggle" class="music-btn">🎵 Music On</button>
-      <button id="clear" class="clear-btn">🧹 Clear Chat</button>
-      <div id="queryCounter">
-        <span>💬 Queries Count: <span id="sessionCount">0</span></span>
+      <div class="button-group">
+        <button id="musicToggle" class="music-btn">🎵 Music On</button>
+        <button id="clear" class="clear-btn">🧹 Clear Chat</button>
       </div>
     </div>
 
+    <div class="character-selection">
+      <select id="character">
+        <option value="">Select a character</option>
+      </select>
+    </div>
+
     <div id="input-area">
-      <input id="prompt" type="text" placeholder="Ask something spooky..." />
+      <textarea id="prompt" placeholder="Ask something spooky..." rows="3"></textarea>
       <div id="cooldownDisplay">
         Cooldown: <span id="cooldownTimer">0</span>s
       </div>

@@ -269,11 +269,6 @@
           <div class="stat-value" id="queriesPerHour">0</div>
         </div>
         
-        <div class="stat-card">
-          <h3>🔥 Recent Activity</h3>
-          <div class="stat-value" id="recentQueries">0</div>
-          <small>(Last 10 minutes)</small>
-        </div>
       </div>
 
       <div class="character-stats">
@@ -283,10 +278,11 @@
         </div>
       </div>
 
+
       <div class="character-stats">
-        <h3>💬 Recent Queries</h3>
-        <div id="recentQueries">
-          <!-- Recent queries will be populated here -->
+        <h3>📋 All Activity History</h3>
+        <div id="allQueries">
+          <!-- All queries will be populated here -->
         </div>
       </div>
 
@@ -379,7 +375,6 @@
           document.getElementById('totalQueries').textContent = stats.totalQueries;
           document.getElementById('uptime').textContent = stats.uptime;
           document.getElementById('queriesPerHour').textContent = stats.queriesPerHour;
-          document.getElementById('recentQueries').textContent = stats.recentQueries;
           
           // Update character stats
           const characterStatsDiv = document.getElementById('characterStats');
@@ -401,14 +396,15 @@
         console.error('Error loading stats:', err);
       }
       
-      // Load query history
-      await loadQueryHistory();
+      // Load all queries
+      await loadAllQueries();
       
       // Load service status
       await loadServiceStatus();
     }
 
-    async function loadQueryHistory() {
+
+    async function loadAllQueries() {
       if (!adminToken) return;
       
       try {
@@ -421,7 +417,7 @@
         if (response.ok) {
           const data = await response.json();
           
-          const queriesDiv = document.getElementById('recentQueries');
+          const queriesDiv = document.getElementById('allQueries');
           queriesDiv.innerHTML = '';
           
           if (data.queries && data.queries.length > 0) {
@@ -438,11 +434,11 @@
               queriesDiv.appendChild(queryItem);
             });
           } else {
-            queriesDiv.innerHTML = '<div style="text-align: center; color: #666; padding: 1rem;">No recent queries</div>';
+            queriesDiv.innerHTML = '<div style="text-align: center; color: #666; padding: 1rem;">No queries yet</div>';
           }
         }
       } catch (err) {
-        console.error('Error loading query history:', err);
+        console.error('Error loading all queries:', err);
       }
     }
 
