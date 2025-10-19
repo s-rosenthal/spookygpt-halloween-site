@@ -112,59 +112,6 @@ function endCooldown() {
   }
 }
 
-// Sound system
-let soundEnabled = true;
-let audioContext;
-let soundEffects = {};
-
-function initSoundSystem() {
-  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  
-  if (isMobile) {
-    soundEnabled = false;
-    return;
-  }
-  
-  try {
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    soundEffects = {
-      click: createTone(800, 0.1, 'sine'),
-      hover: createTone(600, 0.05, 'sine'),
-      send: createTone(1000, 0.2, 'square'),
-      receive: createTone(400, 0.3, 'triangle'),
-      error: createTone(200, 0.5, 'sawtooth')
-    };
-  } catch (e) {
-    soundEnabled = false;
-  }
-}
-
-function createTone(frequency, duration, type = 'sine') {
-  return () => {
-    if (!soundEnabled || !audioContext) return;
-    
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-    
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    
-    oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
-    oscillator.type = type;
-    
-    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
-    
-    oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + duration);
-  };
-}
-
-function playSound(soundName) {
-  if (soundEffects[soundName]) {
-    soundEffects[soundName]();
-  }
-}
 
 // Message functions
 function appendMessage(role, text) {
@@ -176,10 +123,8 @@ function appendMessage(role, text) {
   
   if (role === "bot") {
     msg.innerHTML = `<div class="msg-content">${text}</div>`;
-    playSound('receive');
   } else {
     msg.textContent = text;
-    playSound('send');
   }
   
   chatBox.appendChild(msg);
@@ -204,22 +149,6 @@ function updateMessage(msg, text) {
   chatBox.scrollTop = chatBox.scrollHeight;
 }
 
-// Button effects
-function addButtonEffects() {
-  const buttons = document.querySelectorAll('button');
-  buttons.forEach(button => {
-    button.addEventListener('click', () => playSound('click'));
-    button.addEventListener('mouseenter', () => playSound('hover'));
-  });
-  
-  const selects = document.querySelectorAll('select');
-  selects.forEach(select => {
-    select.addEventListener('change', () => playSound('click'));
-    select.addEventListener('mouseenter', () => playSound('hover'));
-  });
-  
-  input.addEventListener('focus', () => playSound('hover'));
-}
 
 // API functions
 async function loadCharacters() {
@@ -350,7 +279,6 @@ async function sendMessage() {
 
     if (!res.ok) {
       updateMessage(thinkingMsg, `Error: ${res.statusText}`);
-      playSound('error');
       return;
     }
 
@@ -378,7 +306,6 @@ async function sendMessage() {
 
   } catch (err) {
     updateMessage(thinkingMsg, "Network error: " + err.message);
-    playSound('error');
   } finally {
     sendBtn.disabled = false;
     sendBtn.textContent = "Send";
@@ -493,6 +420,4 @@ characterSelect.addEventListener("change", (e) => {
 loadCharacters();
 requestMusicPermission();
 updateMusicButton();
-initSoundSystem();
-addButtonEffects();
 updateInputState();
