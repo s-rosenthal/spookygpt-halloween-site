@@ -25,7 +25,7 @@ let permissionShown = false;
 let isWaitingForResponse = false;
 
 // Speech State
-let speechEnabled = false;
+let speechEnabled = true;
 let speechCache = new Map();
 let speechConfig = {};
 let musicStateBeforeSpeech = false;
@@ -729,6 +729,54 @@ function initializeSpeechSynthesis() {
   return true;
 }
 
+// Load voices on page load
+document.addEventListener('DOMContentLoaded', () => {
+  // Initialize speech button as ON by default
+  if (speechButton) {
+    speechButton.textContent = "🔊 Speech On";
+    speechButton.classList.add("active");
+  }
+  
+  setTimeout(() => {
+    const voices = speechSynthesis.getVoices();
+    console.log('🎤 Available voices:', voices.map(v => v.name));
+    
+    // Check for our specific voices
+    const targetVoices = [
+      "Daniel",
+      "Moira", 
+      "Ralph",
+      "Grandpa (English (US))"
+    ];
+    
+    targetVoices.forEach(voiceName => {
+      const found = voices.find(v => v.name === voiceName);
+      if (found) {
+        console.log(`✅ Found voice: ${voiceName}`);
+      } else {
+        console.log(`❌ Missing voice: ${voiceName}`);
+      }
+    });
+  }, 1000);
+});
+
+// Wait for voices to load
+function waitForVoices() {
+  return new Promise((resolve) => {
+    const voices = speechSynthesis.getVoices();
+    if (voices.length > 0) {
+      console.log('🎤 Voices loaded:', voices.length, 'voices available');
+      resolve(voices);
+    } else {
+      speechSynthesis.addEventListener('voiceschanged', () => {
+        const loadedVoices = speechSynthesis.getVoices();
+        console.log('🎤 Voices loaded:', loadedVoices.length, 'voices available');
+        resolve(loadedVoices);
+      }, { once: true });
+    }
+  });
+}
+
 function speakText(text, characterId) {
   if (!initializeSpeechSynthesis()) {
     return;
@@ -769,17 +817,21 @@ function speakText(text, characterId) {
     utterance.pitch = characterVoice.pitch || 1.0;
     utterance.volume = characterVoice.volume || 0.8;
     
-    // Try to set the voice if available
+    // STRICT voice selection - USE SERVER SETTINGS ONLY
     const voices = window.speechSynthesis.getVoices();
-    const selectedVoice = voices.find(voice => voice.name === characterVoice.voice);
+    const targetVoiceName = characterVoice.voice;
+    const selectedVoice = voices.find(voice => voice.name === targetVoiceName);
+    
     if (selectedVoice) {
       utterance.voice = selectedVoice;
+      console.log(`🎭 Using EXACT voice: ${selectedVoice.name} for ${characterId}`);
     } else {
-      // Fallback to best available voice for character type
-      const fallbackVoice = getBestFallbackVoice(characterId, voices);
-      if (fallbackVoice) {
-        utterance.voice = fallbackVoice;
-      }
+      console.error(`❌ REQUIRED VOICE NOT FOUND: ${targetVoiceName} for ${characterId}`);
+      console.log('Available voices:', voices.map(v => v.name));
+      // NO FALLBACK - just return without speaking
+      enableAllControlsAfterSpeaking();
+      updateSpeechButtonAfterSpeaking();
+      return;
     }
   }
 

@@ -286,22 +286,22 @@ app.get("/api/speech-config", (req, res) => {
     speechEnabled: true,
     characterVoices: {
       default: { 
-        rate: 1.0, 
-        pitch: 1.0, 
+        rate: 0.9, 
+        pitch: 0.7, 
         volume: 0.9,
-        voice: "Google UK English Female",
+        voice: "Daniel",
         effects: {
           reverb: 0.0,
-          echo: 0.0,
+          echo: 0.5,
           distortion: 0.0,
-          lowpass: 1.0
+          lowpass: 0.5
         }
       },
       vampire: { 
-        rate: 0.9, 
-        pitch: 0.9, 
+        rate: 0.8, 
+        pitch: 0.7, 
         volume: 0.9,
-        voice: "Google UK English Male",
+        voice: "Eddy (English (UK))",
         effects: {
           reverb: 0.0,
           echo: 0.0,
@@ -310,10 +310,10 @@ app.get("/api/speech-config", (req, res) => {
         }
       },
       witch: { 
-        rate: 1.0, 
-        pitch: 1.1, 
+        rate: 0.85, 
+        pitch: 1.2, 
         volume: 0.9,
-        voice: "Google UK English Female",
+        voice: "Grandma (English (UK))",
         effects: {
           reverb: 0.0,
           echo: 0.0,
@@ -322,10 +322,10 @@ app.get("/api/speech-config", (req, res) => {
         }
       },
       werewolf: { 
-        rate: 0.95, 
-        pitch: 0.95, 
-        volume: 0.9,
-        voice: "Google UK English Male",
+        rate: 0.85, 
+        pitch: 0.8, 
+        volume: 1.0,
+        voice: "Karen",
         effects: {
           reverb: 0.0,
           echo: 0.0,
@@ -335,9 +335,9 @@ app.get("/api/speech-config", (req, res) => {
       },
       zombie: { 
         rate: 0.8, 
-        pitch: 0.9, 
-        volume: 0.9,
-        voice: "Google UK English Male",
+        pitch: 0.8, 
+        volume: 0.8,
+        voice: "Grandpa (English (US))",
         effects: {
           reverb: 0.0,
           echo: 0.0,
