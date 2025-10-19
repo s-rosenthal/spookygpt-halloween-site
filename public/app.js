@@ -249,6 +249,10 @@ async function sendMessage() {
   input.value = "";
   sendBtn.disabled = true;
   sendBtn.textContent = "Thinking...";
+  
+  // Disable text area while processing
+  input.disabled = true;
+  input.placeholder = "Processing your spooky request...";
 
   // Check if cooldown should start (every 5 messages)
   const newSessionCount = Number(sessionStorage.getItem('spookygpt_session_queries') || '0') + 1;
@@ -309,6 +313,9 @@ async function sendMessage() {
   } finally {
     sendBtn.disabled = false;
     sendBtn.textContent = "Send";
+    
+    // Re-enable text area after processing is complete
+    updateInputState();
   }
 }
 
@@ -395,7 +402,7 @@ clearBtn.addEventListener("click", clearChat);
 musicToggle.addEventListener("click", toggleMusic);
 
 input.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey && !sendBtn.disabled) {
+  if (e.key === "Enter" && !e.shiftKey && !sendBtn.disabled && !input.disabled) {
     e.preventDefault();
     sendMessage();
   }
