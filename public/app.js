@@ -902,36 +902,21 @@ function speakText(text, characterId) {
     utterance.pitch = characterVoice.pitch || 1.0;
     utterance.volume = characterVoice.volume || 0.8;
     
-    // Mobile-friendly voice selection with fallback
+    // Use the same voice everywhere - no mobile fallbacks
     const voices = window.speechSynthesis.getVoices();
-    const isMobileVoice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-    const isAndroid = /Android/i.test(navigator.userAgent);
-    
-    let targetVoiceName = characterVoice.voice; // Default desktop voice
-    
-    // Choose appropriate voice based on platform
-    if (isMobileVoice) {
-      if (isIOS && characterVoice.mobileVoice) {
-        targetVoiceName = characterVoice.mobileVoice;
-        console.log(`📱 iOS detected - using mobile voice: ${targetVoiceName}`);
-      } else if (isAndroid && characterVoice.androidVoice) {
-        targetVoiceName = characterVoice.androidVoice;
-        console.log(`📱 Android detected - using Android voice: ${targetVoiceName}`);
-      }
-    }
+    const targetVoiceName = characterVoice.voice;
     
     console.log(`🎯 Looking for voice: "${targetVoiceName}" for character: ${characterId}`);
     let selectedVoice = voices.find(voice => voice.name === targetVoiceName);
     
     if (selectedVoice) {
       utterance.voice = selectedVoice;
-      console.log(`🎭 Using EXACT voice: ${selectedVoice.name} for ${characterId}`);
+      console.log(`🎭 Using voice: ${selectedVoice.name} for ${characterId}`);
     } else {
       console.warn(`⚠️ Voice "${targetVoiceName}" not found for ${characterId}, using fallback`);
       console.log('Available voices:', voices.map(v => v.name));
       
-      // Use mobile-friendly fallback voice selection
+      // Use fallback voice selection
       selectedVoice = getBestFallbackVoice(characterId, voices);
       
       if (selectedVoice) {
@@ -1028,7 +1013,7 @@ function getBestFallbackVoice(characterId, voices) {
     return null;
   }
   
-  // Mobile-friendly voice preferences (broader matching)
+  // Voice preferences for fallback (same everywhere)
   const voicePreferences = {
     vampire: ['male', 'man', 'masculine', 'deep', 'low'],
     witch: ['female', 'woman', 'feminine', 'high', 'soprano'],
@@ -1039,43 +1024,20 @@ function getBestFallbackVoice(characterId, voices) {
   
   const preferences = voicePreferences[characterId] || voicePreferences.default;
   
-  // Check if we're on mobile
-  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  // Filter out robotic/synthetic voices for better quality
+  const qualityVoices = voices.filter(v => 
+    !v.name.toLowerCase().includes('robotic') &&
+    !v.name.toLowerCase().includes('synthetic') &&
+    !v.name.toLowerCase().includes('artificial')
+  );
   
-  if (isMobile) {
-    console.log('📱 Using mobile-optimized voice selection');
-    
-    // For mobile, prioritize voices that are commonly available
-    const mobileFriendlyVoices = voices.filter(v => 
-      !v.name.toLowerCase().includes('robotic') &&
-      !v.name.toLowerCase().includes('synthetic') &&
-      !v.name.toLowerCase().includes('artificial')
-    );
-    
-    if (mobileFriendlyVoices.length > 0) {
-      // Try to match character preferences
-      for (const preference of preferences) {
-        const voice = mobileFriendlyVoices.find(v => 
-          v.name.toLowerCase().includes(preference) ||
-          v.lang.toLowerCase().includes(preference)
-        );
-        if (voice) {
-          console.log(`📱 Mobile fallback: Found ${voice.name} for ${characterId}`);
-          return voice;
-        }
-      }
-      
-      // Return first mobile-friendly voice
-      console.log(`📱 Mobile fallback: Using first available voice ${mobileFriendlyVoices[0].name}`);
-      return mobileFriendlyVoices[0];
-    }
-  }
+  // Use quality voices for fallback
+  const voicesToUse = qualityVoices.length > 0 ? qualityVoices : voices;
   
-  // Desktop fallback logic
-  // First try to find voices with character preferences
+  // Try to match character preferences
   for (const preference of preferences) {
-    const voice = voices.find(v => 
-      v.name.toLowerCase().includes(preference) || 
+    const voice = voicesToUse.find(v => 
+      v.name.toLowerCase().includes(preference) ||
       v.lang.toLowerCase().includes(preference)
     );
     if (voice) return voice;
@@ -1125,84 +1087,12 @@ function loadSpeechConfig() {
       loadVoices();
     })
     .catch(err => {
-      console.warn('Could not load speech config:', err);
-      // Use natural voice config with no effects and mobile fallbacks
+      console.error('Could not load speech config from server:', err);
+      console.error('Speech synthesis will be disabled until server configuration is available');
       speechConfig = {
-        speechEnabled: true,
-        characterVoices: {
-          default: { 
-            rate: 1.0, 
-            pitch: 1.0, 
-            volume: 0.9,
-            voice: "Google UK English Female",
-            mobileVoice: "Samantha",
-            androidVoice: "Google UK English Female",
-            effects: {
-              reverb: 0.0,
-              echo: 0.0,
-              distortion: 0.0,
-              lowpass: 1.0
-            }
-          },
-          vampire: { 
-            rate: 0.9, 
-            pitch: 0.9, 
-            volume: 0.9,
-            voice: "Google UK English Male",
-            mobileVoice: "Alex",
-            androidVoice: "Google UK English Male",
-            effects: {
-              reverb: 0.0,
-              echo: 0.0,
-              distortion: 0.0,
-              lowpass: 1.0
-            }
-          },
-          witch: { 
-            rate: 1.0, 
-            pitch: 1.1, 
-            volume: 0.9,
-            voice: "Google UK English Female",
-            mobileVoice: "Samantha",
-            androidVoice: "Google UK English Female",
-            effects: {
-              reverb: 0.0,
-              echo: 0.0,
-              distortion: 0.0,
-              lowpass: 1.0
-            }
-          },
-          werewolf: { 
-            rate: 0.95, 
-            pitch: 0.95, 
-            volume: 0.9,
-            voice: "Google UK English Male",
-            mobileVoice: "Alex",
-            androidVoice: "Google UK English Male",
-            effects: {
-              reverb: 0.0,
-              echo: 0.0,
-              distortion: 0.0,
-              lowpass: 1.0
-            }
-          },
-          zombie: { 
-            rate: 0.8, 
-            pitch: 0.9, 
-            volume: 0.9,
-            voice: "Google UK English Male",
-            mobileVoice: "Alex",
-            androidVoice: "Google UK English Male",
-            effects: {
-              reverb: 0.0,
-              echo: 0.0,
-              distortion: 0.0,
-              lowpass: 1.0
-            }
-          }
-        }
+        speechEnabled: false,
+        characterVoices: {}
       };
-      loadVoices();
     });
 }
 

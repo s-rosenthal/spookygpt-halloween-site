@@ -287,21 +287,21 @@ app.get("/api/speech-config", (req, res) => {
     characterVoices: {
       default: { 
         rate: 0.9, 
-        pitch: 0.7, 
+        pitch: 0.3, 
         volume: 0.9,
         voice: "Daniel",
         effects: {
           reverb: 0.0,
-          echo: 0.5,
-          distortion: 0.0,
-          lowpass: 0.5
+          echo: 0.0,
+          distortion: 0.4,
+          lowpass: 0.2
         }
       },
       vampire: { 
         rate: 0.8, 
         pitch: 0.7, 
         volume: 0.9,
-        voice: "Eddy (English (UK))",
+        voice: "Daniel",
         effects: {
           reverb: 0.0,
           echo: 0.0,
@@ -313,12 +313,12 @@ app.get("/api/speech-config", (req, res) => {
         rate: 0.85, 
         pitch: 1.2, 
         volume: 0.9,
-        voice: "Grandma (English (UK))",
+        voice: "Moira",
         effects: {
-          reverb: 0.0,
-          echo: 0.0,
+          reverb: 0.4,
+          echo: 0.1,
           distortion: 0.0,
-          lowpass: 1.0
+          lowpass: 0.6
         }
       },
       werewolf: { 
@@ -334,13 +334,13 @@ app.get("/api/speech-config", (req, res) => {
         }
       },
       zombie: { 
-        rate: 0.8, 
-        pitch: 0.8, 
+        rate: 0.7, 
+        pitch: 0.6, 
         volume: 0.8,
-        voice: "Grandpa (English (US))",
+        voice: "Daniel",
         effects: {
-          reverb: 0.0,
-          echo: 0.0,
+          reverb: 0.1,
+          echo: 0.1,
           distortion: 0.0,
           lowpass: 1.0
         }
