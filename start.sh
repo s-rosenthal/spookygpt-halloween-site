@@ -37,7 +37,7 @@ echo "✅ Docker image rebuilt successfully"
 
 # Start Ollama
 echo "👻 Starting Ollama..."
-ollama serve &
+OLLAMA_HOST=0.0.0.0 ollama serve &
 OLLAMA_PID=$!
 
 # Prevent laptop from sleeping
