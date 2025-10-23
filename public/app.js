@@ -6,7 +6,7 @@ const characterSelect = document.getElementById("character");
 const musicToggle = document.getElementById("musicToggle");
 const backgroundMusic = document.getElementById("backgroundMusic");
 const permissionOverlay = document.getElementById("permissionOverlay");
-const allowMusicBtn = document.getElementById("allowMusicBtn");
+// Button references will be set when DOM is ready
 const cooldownDisplayEl = document.getElementById("cooldownDisplay");
 const cooldownTimerEl = document.getElementById("cooldownTimer");
 
@@ -509,17 +509,39 @@ async function sendMessage(text = null) {
 
 
 // Music functions
-function requestMusicPermission() {
+function requestAudioPermission() {
+  const allowAudioBtn = document.getElementById("allowAudioBtn");
+  
   if (permissionOverlay && !permissionShown) {
     permissionOverlay.style.display = 'flex';
   }
   
-  if (allowMusicBtn) {
-    allowMusicBtn.addEventListener('click', () => {
-      startMusic();
+  if (allowAudioBtn) {
+    allowAudioBtn.addEventListener('click', () => {
+      enableAudioControls();
       hidePermissionOverlay();
     });
   }
+}
+
+function enableAudioControls() {
+  console.log('🔊 Enabling audio controls...');
+  
+  // Enable music
+  startMusic();
+  
+  // Enable speech by triggering user interaction
+  if ('speechSynthesis' in window) {
+    console.log('🎤 Speech synthesis enabled via user interaction');
+    // Create a silent utterance to enable speech synthesis
+    const utterance = new SpeechSynthesisUtterance('');
+    utterance.volume = 0;
+    window.speechSynthesis.speak(utterance);
+    window.speechSynthesis.cancel();
+  }
+  
+  // Mark audio as enabled
+  window.audioEnabled = true;
 }
 
 function startMusic() {
@@ -724,9 +746,47 @@ function createSubtleDistortionCurve(amount) {
 function initializeSpeechSynthesis() {
   if (!('speechSynthesis' in window)) {
     console.warn('Speech synthesis not supported');
+    showSpeechNotSupportedMessage();
     return false;
   }
+  
+  // Check if we're on a mobile device
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  
+  if (isMobile) {
+    console.log('📱 Mobile device detected - using mobile-optimized speech synthesis');
+  }
+  
   return true;
+}
+
+function showSpeechNotSupportedMessage() {
+  // Show a user-friendly message when speech synthesis isn't supported
+  const message = document.createElement('div');
+  message.style.cssText = `
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255, 69, 0, 0.9);
+    color: white;
+    padding: 1rem 2rem;
+    border-radius: 10px;
+    z-index: 1000;
+    font-weight: bold;
+    text-align: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  `;
+  message.innerHTML = '🔇 Speech not supported on this device. Text-only mode active.';
+  
+  document.body.appendChild(message);
+  
+  // Remove message after 5 seconds
+  setTimeout(() => {
+    if (message.parentNode) {
+      message.parentNode.removeChild(message);
+    }
+  }, 5000);
 }
 
 // Load voices on page load
@@ -746,7 +806,7 @@ document.addEventListener('DOMContentLoaded', () => {
       "Daniel",
       "Moira", 
       "Ralph",
-      "Grandpa (English (US))"
+      "Grandpa"
     ];
     
     targetVoices.forEach(voiceName => {
@@ -778,23 +838,48 @@ function waitForVoices() {
 }
 
 function speakText(text, characterId) {
+  console.log(`🎤 speakText called: characterId=${characterId}, text="${text.substring(0, 50)}..."`);
+  
+  // Check if audio controls are enabled
+  if (!window.audioEnabled) {
+    console.log('🔇 Audio controls not enabled - skipping speech');
+    return;
+  }
+  
+  // Mobile devices can use the full character voice system
+  
   if (!initializeSpeechSynthesis()) {
+    console.error('❌ Speech synthesis initialization failed');
+    showMobileSpeechAlternative(text);
     return;
   }
 
   // Clean text for better speech synthesis
   const cleanText = cleanTextForSpeech(text);
   if (!cleanText) {
+    console.warn('⚠️ Clean text is empty, skipping speech');
     return;
   }
+  
+  console.log(`🧹 Cleaned text: "${cleanText}"`);
 
   // Simple cache check
   const cacheKey = `${characterId}-${cleanText}`;
   if (speechCache.has(cacheKey)) {
+    console.log('♻️ Speech already cached, skipping');
     return;
   }
   speechCache.set(cacheKey, true);
   if (speechCache.size > 50) speechCache.clear();
+
+  // Check if we're on mobile and need user interaction
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  
+  if (isMobile) {
+    // For mobile browsers, ensure we have user interaction
+    // This is often required for speech synthesis to work
+    console.log('📱 Mobile device - ensuring user interaction for speech synthesis');
+  }
 
   // Save current music state and pause music
   musicStateBeforeSpeech = isMusicPlaying;
@@ -817,31 +902,61 @@ function speakText(text, characterId) {
     utterance.pitch = characterVoice.pitch || 1.0;
     utterance.volume = characterVoice.volume || 0.8;
     
-    // STRICT voice selection - USE SERVER SETTINGS ONLY
+    // Mobile-friendly voice selection with fallback
     const voices = window.speechSynthesis.getVoices();
-    const targetVoiceName = characterVoice.voice;
-    const selectedVoice = voices.find(voice => voice.name === targetVoiceName);
+    const isMobileVoice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    
+    let targetVoiceName = characterVoice.voice; // Default desktop voice
+    
+    // Choose appropriate voice based on platform
+    if (isMobileVoice) {
+      if (isIOS && characterVoice.mobileVoice) {
+        targetVoiceName = characterVoice.mobileVoice;
+        console.log(`📱 iOS detected - using mobile voice: ${targetVoiceName}`);
+      } else if (isAndroid && characterVoice.androidVoice) {
+        targetVoiceName = characterVoice.androidVoice;
+        console.log(`📱 Android detected - using Android voice: ${targetVoiceName}`);
+      }
+    }
+    
+    console.log(`🎯 Looking for voice: "${targetVoiceName}" for character: ${characterId}`);
+    let selectedVoice = voices.find(voice => voice.name === targetVoiceName);
     
     if (selectedVoice) {
       utterance.voice = selectedVoice;
       console.log(`🎭 Using EXACT voice: ${selectedVoice.name} for ${characterId}`);
     } else {
-      console.error(`❌ REQUIRED VOICE NOT FOUND: ${targetVoiceName} for ${characterId}`);
+      console.warn(`⚠️ Voice "${targetVoiceName}" not found for ${characterId}, using fallback`);
       console.log('Available voices:', voices.map(v => v.name));
-      // NO FALLBACK - just return without speaking
-      enableAllControlsAfterSpeaking();
-      updateSpeechButtonAfterSpeaking();
-      return;
+      
+      // Use mobile-friendly fallback voice selection
+      selectedVoice = getBestFallbackVoice(characterId, voices);
+      
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+        console.log(`🎭 Using FALLBACK voice: ${selectedVoice.name} for ${characterId}`);
+      } else {
+        console.warn(`⚠️ No suitable voice found for ${characterId}, using default`);
+        // Let the browser use its default voice
+      }
     }
   }
 
   // Create voice effects for this character
   const voiceEffects = createVoiceEffects(characterId);
+  console.log('🎛️ Voice effects created:', voiceEffects ? 'Yes' : 'No');
   
   // Enhanced character-specific speech modifications
   applyCharacterVoiceModifications(utterance, characterId);
 
+  utterance.onstart = () => {
+    console.log('🎵 Speech STARTED - audio should be playing now');
+  };
+
   utterance.onend = () => {
+    console.log('🏁 Speech ENDED - audio finished');
     // Clean up voice effects
     if (voiceEffects) {
       voiceEffects.cleanup();
@@ -862,10 +977,21 @@ function speakText(text, characterId) {
     }
   };
 
-  utterance.onerror = () => {
+  utterance.onerror = (event) => {
+    console.error('Speech synthesis error:', event.error);
+    
     // Clean up voice effects
     if (voiceEffects) {
       voiceEffects.cleanup();
+    }
+    
+    // Provide user feedback for mobile-specific issues
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+      console.warn('📱 Mobile speech synthesis failed - this may be due to browser limitations');
+      // On mobile, we might want to show a subtle notification
+      // but don't interrupt the user experience
     }
     
     // Re-enable all controls even if there's an error
@@ -883,31 +1009,70 @@ function speakText(text, characterId) {
     }
   };
 
+  console.log('🔊 About to call speechSynthesis.speak()...');
+  console.log('📊 Utterance details:', {
+    text: utterance.text,
+    voice: utterance.voice?.name || 'default',
+    rate: utterance.rate,
+    pitch: utterance.pitch,
+    volume: utterance.volume
+  });
+  
   window.speechSynthesis.speak(utterance);
+  console.log('✅ speechSynthesis.speak() called');
 }
 
 function getBestFallbackVoice(characterId, voices) {
-  // Prioritize the most natural, human-like voices
+  if (!voices || voices.length === 0) {
+    console.warn('No voices available for fallback');
+    return null;
+  }
+  
+  // Mobile-friendly voice preferences (broader matching)
   const voicePreferences = {
-    vampire: ['google', 'male', 'british', 'english', 'us', 'natural'],
-    witch: ['google', 'female', 'british', 'english', 'us', 'natural'],
-    werewolf: ['google', 'male', 'british', 'english', 'us', 'natural'],
-    zombie: ['google', 'male', 'british', 'english', 'us', 'natural'],
-    default: ['google', 'female', 'british', 'english', 'us', 'natural']
+    vampire: ['male', 'man', 'masculine', 'deep', 'low'],
+    witch: ['female', 'woman', 'feminine', 'high', 'soprano'],
+    werewolf: ['male', 'man', 'masculine', 'deep', 'growl'],
+    zombie: ['male', 'man', 'masculine', 'deep', 'slow'],
+    default: ['female', 'woman', 'feminine', 'natural']
   };
   
   const preferences = voicePreferences[characterId] || voicePreferences.default;
   
-  // First try to find Google voices (usually most natural)
-  for (const preference of preferences) {
-    const voice = voices.find(v => 
-      v.name.toLowerCase().includes(preference) && 
-      v.name.toLowerCase().includes('google')
+  // Check if we're on mobile
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  
+  if (isMobile) {
+    console.log('📱 Using mobile-optimized voice selection');
+    
+    // For mobile, prioritize voices that are commonly available
+    const mobileFriendlyVoices = voices.filter(v => 
+      !v.name.toLowerCase().includes('robotic') &&
+      !v.name.toLowerCase().includes('synthetic') &&
+      !v.name.toLowerCase().includes('artificial')
     );
-    if (voice) return voice;
+    
+    if (mobileFriendlyVoices.length > 0) {
+      // Try to match character preferences
+      for (const preference of preferences) {
+        const voice = mobileFriendlyVoices.find(v => 
+          v.name.toLowerCase().includes(preference) ||
+          v.lang.toLowerCase().includes(preference)
+        );
+        if (voice) {
+          console.log(`📱 Mobile fallback: Found ${voice.name} for ${characterId}`);
+          return voice;
+        }
+      }
+      
+      // Return first mobile-friendly voice
+      console.log(`📱 Mobile fallback: Using first available voice ${mobileFriendlyVoices[0].name}`);
+      return mobileFriendlyVoices[0];
+    }
   }
   
-  // Then try any voice with preferences
+  // Desktop fallback logic
+  // First try to find voices with character preferences
   for (const preference of preferences) {
     const voice = voices.find(v => 
       v.name.toLowerCase().includes(preference) || 
@@ -924,7 +1089,8 @@ function getBestFallbackVoice(characterId, voices) {
     !v.name.toLowerCase().includes('system') &&
     (v.name.toLowerCase().includes('natural') ||
      v.name.toLowerCase().includes('human') ||
-     v.name.toLowerCase().includes('neural'))
+     v.name.toLowerCase().includes('neural') ||
+     v.name.toLowerCase().includes('enhanced'))
   );
   
   if (naturalVoices.length > 0) {
@@ -932,6 +1098,7 @@ function getBestFallbackVoice(characterId, voices) {
   }
   
   // Fallback to first available voice
+  console.log(`🔄 Using first available voice: ${voices[0].name}`);
   return voices[0] || null;
 }
 
@@ -959,7 +1126,7 @@ function loadSpeechConfig() {
     })
     .catch(err => {
       console.warn('Could not load speech config:', err);
-      // Use natural voice config with no effects
+      // Use natural voice config with no effects and mobile fallbacks
       speechConfig = {
         speechEnabled: true,
         characterVoices: {
@@ -968,6 +1135,8 @@ function loadSpeechConfig() {
             pitch: 1.0, 
             volume: 0.9,
             voice: "Google UK English Female",
+            mobileVoice: "Samantha",
+            androidVoice: "Google UK English Female",
             effects: {
               reverb: 0.0,
               echo: 0.0,
@@ -980,6 +1149,8 @@ function loadSpeechConfig() {
             pitch: 0.9, 
             volume: 0.9,
             voice: "Google UK English Male",
+            mobileVoice: "Alex",
+            androidVoice: "Google UK English Male",
             effects: {
               reverb: 0.0,
               echo: 0.0,
@@ -992,6 +1163,8 @@ function loadSpeechConfig() {
             pitch: 1.1, 
             volume: 0.9,
             voice: "Google UK English Female",
+            mobileVoice: "Samantha",
+            androidVoice: "Google UK English Female",
             effects: {
               reverb: 0.0,
               echo: 0.0,
@@ -1004,6 +1177,8 @@ function loadSpeechConfig() {
             pitch: 0.95, 
             volume: 0.9,
             voice: "Google UK English Male",
+            mobileVoice: "Alex",
+            androidVoice: "Google UK English Male",
             effects: {
               reverb: 0.0,
               echo: 0.0,
@@ -1016,6 +1191,8 @@ function loadSpeechConfig() {
             pitch: 0.9, 
             volume: 0.9,
             voice: "Google UK English Male",
+            mobileVoice: "Alex",
+            androidVoice: "Google UK English Male",
             effects: {
               reverb: 0.0,
               echo: 0.0,
@@ -1030,6 +1207,17 @@ function loadSpeechConfig() {
 }
 
 function loadVoices() {
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  
+  // Mobile browsers often need a trigger to load voices
+  if (isMobile) {
+    console.log('📱 Mobile device - triggering voice loading');
+    // Create a temporary utterance to trigger voice loading on mobile
+    const tempUtterance = new SpeechSynthesisUtterance('');
+    window.speechSynthesis.speak(tempUtterance);
+    window.speechSynthesis.cancel(); // Cancel immediately
+  }
+  
   // Ensure voices are loaded
   if (window.speechSynthesis.getVoices().length === 0) {
     window.speechSynthesis.addEventListener('voiceschanged', () => {
@@ -1078,6 +1266,332 @@ if (speechButton) {
   });
 }
 
+// Test speech button event listener
+const testSpeechBtn = document.getElementById("testSpeechBtn");
+console.log('🔍 Test speech button element:', testSpeechBtn);
+if (testSpeechBtn) {
+  console.log('✅ Test speech button found, adding event listener');
+  testSpeechBtn.addEventListener("click", () => {
+    console.log('🧪 Test button clicked - running speech test...');
+    testSpeechSynthesis();
+  });
+} else {
+  console.error('❌ Test speech button not found!');
+}
+
+// Simple test button event listener
+const simpleTestBtn = document.getElementById("simpleTestBtn");
+if (simpleTestBtn) {
+  simpleTestBtn.addEventListener("click", () => {
+    console.log('🔬 Simple test button clicked...');
+    simpleSpeechTest();
+  });
+}
+
+// Mobile test button event listener
+const mobileTestBtn = document.getElementById("mobileTestBtn");
+if (mobileTestBtn) {
+  mobileTestBtn.addEventListener("click", () => {
+    console.log('📱 Mobile test button clicked...');
+    speakTextSimple('Hello, this is a mobile speech test. Can you hear me?');
+  });
+}
+
+// Alternative test button event listener
+const altTestBtn = document.getElementById("altTestBtn");
+console.log('🔍 Alt test button element:', altTestBtn);
+if (altTestBtn) {
+  console.log('✅ Alt test button found, adding event listener');
+  altTestBtn.addEventListener("click", () => {
+    console.log('🔄 Alternative test button clicked...');
+    console.log('🔊 About to try speech synthesis...');
+    
+    // Super simple test first
+    try {
+      const utterance = new SpeechSynthesisUtterance('Test');
+      utterance.onstart = () => console.log('✅ Speech started!');
+      utterance.onend = () => console.log('✅ Speech ended!');
+      utterance.onerror = (e) => console.log('❌ Speech error:', e.error);
+      window.speechSynthesis.speak(utterance);
+      console.log('✅ speak() called successfully');
+    } catch (error) {
+      console.error('❌ Error calling speech synthesis:', error);
+    }
+  });
+} else {
+  console.error('❌ Alt test button not found!');
+}
+
+// Simple speech test that bypasses all app logic
+function simpleSpeechTest() {
+  console.log('🔬 Running SIMPLE speech test...');
+  
+  // Stop any existing speech first
+  window.speechSynthesis.cancel();
+  
+  // Wait a moment for cancellation to complete
+  setTimeout(() => {
+    const utterance = new SpeechSynthesisUtterance('Hello world');
+    
+    // Use default settings - no voice selection
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    
+    utterance.onstart = () => {
+      console.log('✅ SIMPLE test: Speech started!');
+    };
+    
+    utterance.onend = () => {
+      console.log('✅ SIMPLE test: Speech ended!');
+    };
+    
+    utterance.onerror = (event) => {
+      console.error('❌ SIMPLE test error:', event.error);
+    };
+    
+    console.log('🔊 SIMPLE test: About to speak...');
+    window.speechSynthesis.speak(utterance);
+    console.log('✅ SIMPLE test: speak() called');
+  }, 100);
+}
+
+// Make simple test available globally
+window.simpleSpeechTest = simpleSpeechTest;
+
+// Super simple mobile speech function
+function speakTextSimple(text) {
+  console.log('📱 Simple mobile speech:', text.substring(0, 50) + '...');
+  
+  // Stop any existing speech
+  window.speechSynthesis.cancel();
+  
+  // Wait briefly then speak
+  setTimeout(() => {
+    const utterance = new SpeechSynthesisUtterance(text);
+    
+    // Use default voice and settings
+    utterance.rate = 0.9;
+    utterance.pitch = 1.0;
+    utterance.volume = 0.8;
+    
+    utterance.onstart = () => {
+      console.log('✅ Mobile speech started');
+    };
+    
+    utterance.onend = () => {
+      console.log('✅ Mobile speech ended');
+    };
+    
+    utterance.onerror = (event) => {
+      console.error('❌ Mobile speech error:', event.error);
+    };
+    
+    console.log('🔊 Speaking:', text);
+    window.speechSynthesis.speak(utterance);
+  }, 200);
+}
+
+// Alternative TTS using Web Speech API with different approach
+function speakTextAlternative(text) {
+  console.log('🔄 Trying alternative TTS approach...');
+  
+  // Clean the text
+  const cleanText = text.replace(/[👻🎃🧙‍♀️🧛‍♂️🐺🧠⚗️✨🔮🌙💭]/g, '').trim();
+  
+  if (!cleanText) {
+    console.log('⚠️ No text to speak after cleaning');
+    return;
+  }
+  
+  // Try multiple approaches
+  tryApproach1(cleanText);
+}
+
+function tryApproach1(text) {
+  console.log('🔄 Approach 1: Basic utterance with no voice selection');
+  
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate = 0.8;
+  utterance.pitch = 1.0;
+  utterance.volume = 1.0;
+  
+  utterance.onstart = () => {
+    console.log('✅ Approach 1: Speech started!');
+  };
+  
+  utterance.onend = () => {
+    console.log('✅ Approach 1: Speech completed!');
+  };
+  
+  utterance.onerror = (event) => {
+    console.log('❌ Approach 1 failed:', event.error);
+    tryApproach2(text);
+  };
+  
+  window.speechSynthesis.speak(utterance);
+  
+  // If no response in 3 seconds, try next approach
+  setTimeout(() => {
+    if (!utterance.onstart) {
+      console.log('⏰ Approach 1 timeout, trying approach 2');
+      tryApproach2(text);
+    }
+  }, 3000);
+}
+
+function tryApproach2(text) {
+  console.log('🔄 Approach 2: Using first available voice');
+  
+  const voices = window.speechSynthesis.getVoices();
+  if (voices.length === 0) {
+    console.log('❌ No voices available for approach 2');
+    tryApproach3(text);
+    return;
+  }
+  
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.voice = voices[0];
+  utterance.rate = 0.9;
+  utterance.pitch = 1.0;
+  utterance.volume = 0.9;
+  
+  utterance.onstart = () => {
+    console.log('✅ Approach 2: Speech started!');
+  };
+  
+  utterance.onend = () => {
+    console.log('✅ Approach 2: Speech completed!');
+  };
+  
+  utterance.onerror = (event) => {
+    console.log('❌ Approach 2 failed:', event.error);
+    tryApproach3(text);
+  };
+  
+  window.speechSynthesis.speak(utterance);
+}
+
+function tryApproach3(text) {
+  console.log('🔄 Approach 3: Audio element fallback');
+  
+  // Create a simple audio notification instead
+  const audio = new Audio();
+  audio.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT';
+  audio.volume = 0.3;
+  
+  audio.onplay = () => {
+    console.log('✅ Approach 3: Audio notification played');
+  };
+  
+  audio.onerror = () => {
+    console.log('❌ All approaches failed - speech not supported on this device');
+    showSpeechNotSupportedMessage();
+  };
+  
+  audio.play().catch(() => {
+    console.log('❌ All approaches failed - speech not supported on this device');
+    showSpeechNotSupportedMessage();
+  });
+}
+
+// Mobile speech capability testing
+function testMobileSpeechCapability() {
+  console.log('📱 Testing mobile speech capability...');
+  
+  const utterance = new SpeechSynthesisUtterance('Test');
+  let speechWorked = false;
+  
+  utterance.onstart = () => {
+    console.log('✅ Mobile speech test: SUCCESS!');
+    speechWorked = true;
+  };
+  
+  utterance.onend = () => {
+    console.log('✅ Mobile speech test: Completed');
+  };
+  
+  utterance.onerror = (event) => {
+    console.log('❌ Mobile speech test: Failed -', event.error);
+  };
+  
+  // Set a timeout to detect if speech never starts
+  setTimeout(() => {
+    if (!speechWorked) {
+      console.log('⚠️ Mobile speech test: No audio detected - mobile speech likely not working');
+      showMobileSpeechInfo();
+    }
+  }, 2000);
+  
+  window.speechSynthesis.speak(utterance);
+}
+
+function showMobileSpeechInfo() {
+  const message = document.createElement('div');
+  message.style.cssText = `
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 2rem;
+    border-radius: 15px;
+    z-index: 2000;
+    font-weight: bold;
+    text-align: center;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    max-width: 300px;
+    width: 90%;
+  `;
+  message.innerHTML = `
+    <div style="font-size: 1.5rem; margin-bottom: 1rem;">📱 Mobile Speech Issue</div>
+    <div style="font-size: 1rem; margin-bottom: 1.5rem; line-height: 1.4;">
+      Speech synthesis doesn't work reliably on mobile browsers. This is a known limitation.
+    </div>
+    <div style="font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8;">
+      Your app will work perfectly for text conversations!
+    </div>
+    <button onclick="this.parentElement.remove()" style="
+      padding: 0.8rem 1.5rem;
+      border: none;
+      border-radius: 10px;
+      background: #ff4500;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    ">Got it!</button>
+  `;
+  
+  document.body.appendChild(message);
+}
+
+function showMobileSpeechAlternative(text) {
+  // Show a subtle notification that speech isn't available
+  const message = document.createElement('div');
+  message.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(255, 69, 0, 0.9);
+    color: white;
+    padding: 0.8rem 1.2rem;
+    border-radius: 8px;
+    z-index: 1000;
+    font-size: 0.9rem;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  `;
+  message.innerHTML = '🔇 Speech not available on mobile';
+  
+  document.body.appendChild(message);
+  
+  setTimeout(() => {
+    if (message.parentNode) {
+      message.parentNode.removeChild(message);
+    }
+  }, 3000);
+}
+
 input.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey && !sendBtn.disabled && !input.disabled) {
     e.preventDefault();
@@ -1116,9 +1630,122 @@ characterSelect.addEventListener("change", (e) => {
   }
 });
 
+// Simple speech test function for debugging
+function testSpeechSynthesis() {
+  console.log('🧪 Testing speech synthesis...');
+  
+  // Check if speech synthesis is supported
+  if (!('speechSynthesis' in window)) {
+    console.error('❌ Speech synthesis not supported');
+    return false;
+  }
+  
+  console.log('✅ Speech synthesis is supported');
+  
+  // Get available voices
+  const voices = window.speechSynthesis.getVoices();
+  console.log(`📢 Found ${voices.length} voices:`, voices.map(v => v.name));
+  
+  if (voices.length === 0) {
+    console.warn('⚠️ No voices found - trying to load voices...');
+    // Try to trigger voice loading
+    const tempUtterance = new SpeechSynthesisUtterance('');
+    window.speechSynthesis.speak(tempUtterance);
+    window.speechSynthesis.cancel();
+    
+    // Wait a bit and check again
+    setTimeout(() => {
+      const voicesAfter = window.speechSynthesis.getVoices();
+      console.log(`📢 After loading attempt: ${voicesAfter.length} voices:`, voicesAfter.map(v => v.name));
+      
+      if (voicesAfter.length > 0) {
+        testActualSpeech(voicesAfter[0]);
+      } else {
+        console.error('❌ Still no voices available');
+      }
+    }, 1000);
+  } else {
+    testActualSpeech(voices[0]);
+  }
+  
+  return true;
+}
+
+function testActualSpeech(voice) {
+  console.log(`🎤 Testing speech with voice: ${voice.name}`);
+  
+  const utterance = new SpeechSynthesisUtterance('Hello, this is a test of speech synthesis');
+  utterance.voice = voice;
+  utterance.rate = 0.9;
+  utterance.pitch = 1.0;
+  utterance.volume = 0.8;
+  
+  utterance.onstart = () => {
+    console.log('✅ Speech started successfully!');
+  };
+  
+  utterance.onend = () => {
+    console.log('✅ Speech completed successfully!');
+  };
+  
+  utterance.onerror = (event) => {
+    console.error('❌ Speech error:', event.error);
+  };
+  
+  console.log('🔊 Attempting to speak...');
+  console.log('📊 Test utterance details:', {
+    text: utterance.text,
+    voice: utterance.voice?.name || 'default',
+    rate: utterance.rate,
+    pitch: utterance.pitch,
+    volume: utterance.volume
+  });
+  
+  window.speechSynthesis.speak(utterance);
+  console.log('✅ Test speechSynthesis.speak() called');
+}
+
+// Make test function available globally for console testing
+window.testSpeechSynthesis = testSpeechSynthesis;
+
 // Initialize application
-loadCharacters();
-loadSpeechConfig();
-requestMusicPermission();
-updateMusicButton();
-updateInputState();
+console.log('🚀 Initializing SpookyGPT application...');
+console.log('📱 User agent:', navigator.userAgent);
+console.log('🔍 Speech synthesis available:', 'speechSynthesis' in window);
+
+try {
+  console.log('📡 Loading characters...');
+  loadCharacters();
+} catch (error) {
+  console.error('❌ Error loading characters:', error);
+}
+
+try {
+  console.log('🎤 Loading speech config...');
+  loadSpeechConfig();
+} catch (error) {
+  console.error('❌ Error loading speech config:', error);
+}
+
+try {
+  console.log('🔊 Requesting audio permission...');
+  requestAudioPermission();
+} catch (error) {
+  console.error('❌ Error requesting audio permission:', error);
+}
+
+try {
+  console.log('🎵 Updating music button...');
+  updateMusicButton();
+} catch (error) {
+  console.error('❌ Error updating music button:', error);
+}
+
+try {
+  console.log('📝 Updating input state...');
+  updateInputState();
+} catch (error) {
+  console.error('❌ Error updating input state:', error);
+}
+
+console.log('✅ Application initialization complete');
